@@ -1,6 +1,3 @@
-# Что нового:
-# -
-# -
 
 from dotenv import dotenv_values
 from aiogram import Bot, Dispatcher, F
@@ -29,12 +26,14 @@ dp = Dispatcher()
 
 logging.basicConfig(filename='errors.log', level=logging.ERROR,  # Настройки логгирования
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-amount_songs = 355
+amount_songs = 366
 
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
     try:
-        await message.answer(text='Добро пожаловать! Отправь боту номер песни или фразу из песни...')
+        await message.answer(text='Добро пожаловать! Отправь боту номер песни или фразу из песни. Также найти песню '
+                                  'можно по названию на английском или по автору! А ещё, выбрав пункт МЕНЮ, ты сможешь '
+                                  'сформировать список песен по некоторым авторам или по содержанию.')
         metrics('users', message)
     except Exception as e:
         logging.exception(e)
@@ -44,9 +43,10 @@ async def welcome(message: Message):
 async def search_song(message: Message):
     search_text = message.text.strip().lower()
     if search_text in ('users', 'users today', 'users month', 'queries'):
-        info = get_info(search_text)
-        await message.answer(info)
-    elif search_text in ('/c1', '/c2', '/c3', '/ch', '/sgm', '/gt', '/tr', '/hill', '/kk'):
+        if message.chat.id == '597856040':
+            info = get_info(search_text)
+            await message.answer(info)
+    elif search_text in ('/c1', '/c2', '/c3', '/sgm', '/gt', '/tr', '/hill', '/kk'):
         content = get_contents(search_text)
         await message.answer(content)
         metrics('cnt_by_content', message)
@@ -60,9 +60,6 @@ async def search_song(message: Message):
             await message.answer(result, reply_markup=keyword)
         else:
             await message.answer(text=result, show_alert=True)
-        if christmas_msg(message):
-            await message.answer('🎄🎄🎄 РОЖДЕСТВО за окном! 🎄🎄🎄 \n'
-                'Через МЕНЮ (синяя кнопка) можно получить подборку рождественских песен! Список будет дополняться.')
         metrics('cnt_by_nums', message)
     else:
         if len(search_text) < 4:
@@ -77,11 +74,8 @@ async def search_song(message: Message):
 @dp.callback_query(F.data == 'Chords')  # Обработчик нажатия кнопки "Аккорды"
 async def on_click_chords(callback: CallbackQuery):
     try:
-        # if num_song <= 350:
         file = FSInputFile(f'Chords_jpg/{num_song}.jpg')
         await bot.send_photo(chat_id=callback.message.chat.id, photo=file)
-        # else:
-        #     await bot.send_message(callback.message.chat.id, 'Пока аккорды есть только на песни с 1 до 350. 😇')
         metrics('cnt_by_chords', callback.message)
     except Exception as e:
         logging.exception(e)
@@ -97,30 +91,7 @@ async def on_click_chords(callback: CallbackQuery):
 #             logging.exception(e)
 
 
-def get_info(my_query):
-    try:
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
-        cursor = conn.cursor()
-        current_date = datetime.date.today()
-        if my_query == 'users':
-            cursor.execute("SELECT MAX(id) FROM users")
-        elif my_query == 'users today':
-            cursor.execute(f"SELECT COUNT(*) FROM users WHERE last_access >= '{current_date}'")
-        elif my_query == 'users month':
-            cursor.execute(f"SELECT COUNT(u.*) FROM users u JOIN periods p ON p.id = '{str(current_date)[:7]}' "
-                           f"WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end")
-        elif my_query == 'queries':
-            cursor.execute("SELECT SUM(cnt_by_content + cnt_by_nums + cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + "
-                           "cnt_by_media_en) FROM metrics")
-        result = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return str(result[0][0])
-    except Exception as e:
-        logging.exception(e)
-
-
-def get_contents(c):  # Функция для получения оглавления по номерам
+def get_contents(c):  # Функция для получения разных списков песен
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
@@ -130,9 +101,9 @@ def get_contents(c):  # Функция для получения оглавле�
             cursor.execute("SELECT num, name FROM songs WHERE num BETWEEN 151 and 290 ORDER BY num")
         elif c == '/c3':
             cursor.execute("SELECT num, name FROM songs WHERE num > 290 ORDER BY num")
-        elif c == '/ch':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num = ANY(string_to_array(("
-                           "SELECT song_nums FROM themes WHERE theme = 'Рождество Христа'), ', ')::int[]) ORDER BY num")
+        # elif c == '/ch':
+        #     cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num = ANY(string_to_array(("
+        #                    "SELECT song_nums FROM themes WHERE theme = 'Рождество Христа'), ', ')::int[]) ORDER BY num")
         elif c == '/sgm':
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Sovereign Grace Music%' ORDER BY num")
@@ -164,26 +135,6 @@ def get_contents(c):  # Функция для получения оглавле�
         logging.exception(e)
 
 
-def christmas_msg(message):
-    try:
-        user_id = message.chat.id
-        current_date = datetime.date.today()
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT telgrm_user_id FROM christmas_users WHERE telgrm_user_id = {user_id}")
-        if not cursor.fetchone():  # Если user_id в christmas_users нет, то записываем и возвращаем Тrue
-            cursor.execute(f"INSERT INTO christmas_users (telgrm_user_id, first_access) VALUES ({user_id}, current_date)")
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return True
-        else:
-            cursor.close()
-            conn.close()
-    except Exception as e:
-        logging.exception(e)
-
-
 def search_song_by_num(song_num):  # Функция поиска песни по номеру
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
@@ -196,7 +147,8 @@ def search_song_by_num(song_num):  # Функция поиска песни по
         if result:
             return f'{result[0]}\n{sep}\n{result[1] if result[1] else ""}\n{result[2] if result[2] else ""}'
         else:
-            return f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или фразу из песни...'
+            return (f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или фразу из песни. '
+                    f'Также найти песню можно по названию на английском или по автору!')
     except Exception as e:
         logging.exception(e)
 
@@ -206,12 +158,40 @@ def search_song_by_text(search_text):  # Функция поиска песни 
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"SELECT num, name FROM songs WHERE REPLACE(text, ',', '') ILIKE '%{search_text.replace(',', '')}%' "
-                       f"OR REPLACE(name, ',', '') ILIKE '%{search_text.replace(',', '')}%'")
+                       f"OR REPLACE(name, ',', '') ILIKE '%{search_text.replace(',', '')}%' "
+                       f"OR REPLACE(alt_name, ',', '') ILIKE '%{search_text.replace(',', '')}%'"
+                       f"OR REPLACE(en_name, ',', '') ILIKE '%{search_text.replace(',', '')}%' "
+                       f"OR REPLACE(authors, ',', '') ILIKE '%{search_text.replace(',', '')}%'")
         result = cursor.fetchall()
         cursor.close()
         conn.close()
+        print(result)
         return '\n'.join([f'{song[0]} - {song[1]}' for song in result]) if result \
-            else 'Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни...'
+            else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
+                  'Также найти песню можно по названию на английском или по автору!')
+    except Exception as e:
+        logging.exception(e)
+
+
+def get_info(my_query):
+    try:
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        current_date = datetime.date.today()
+        if my_query == 'users':
+            cursor.execute("SELECT MAX(id) FROM users")
+        elif my_query == 'users today':
+            cursor.execute(f"SELECT COUNT(*) FROM users WHERE last_access >= '{current_date}'")
+        elif my_query == 'users month':
+            cursor.execute(f"SELECT COUNT(u.*) FROM users u JOIN periods p ON p.id = '{str(current_date)[:7]}' "
+                           f"WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end")
+        elif my_query == 'queries':
+            cursor.execute("SELECT SUM(cnt_by_content + cnt_by_nums + cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + "
+                           "cnt_by_media_en) FROM metrics")
+        result = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return str(result[0][0])
     except Exception as e:
         logging.exception(e)
 
