@@ -42,10 +42,9 @@ async def welcome(message: Message):
 @dp.message()  # Обработчик текстовых сообщений
 async def search_song(message: Message):
     search_text = message.text.strip().lower()
-    if search_text in ('users', 'users today', 'users month', 'queries'):
-        if message.chat.id == 597856040:
-            info = get_info(search_text)
-            await message.answer(info)
+    if search_text == 'users' and message.chat.id == 597856040:
+        info = get_info(search_text)
+        await message.answer(info)
     elif search_text in ('/c1', '/c2', '/c3', '/sgm', '/gt', '/tr', '/hill', '/kk'):
         content = get_contents(search_text)
         if type(content) is list:
@@ -151,7 +150,10 @@ def search_song_by_num(song_num):  # Функция поиска песни по
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        cursor.execute(f'SELECT text, en_name, authors FROM songs WHERE num = {song_num}')
+        cursor.execute(f"UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {song_num} "
+                       f"RETURNING text, en_name, authors")
+        # cursor.execute(f"UPDATE songs SET cnt_using = cnt_using + 1 WHERE num = {song_num}")
+        # cursor.execute(f'SELECT text, en_name, authors FROM songs WHERE num = {song_num}')
         result = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -162,6 +164,7 @@ def search_song_by_num(song_num):  # Функция поиска песни по
             return (f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или фразу из песни. '
                     f'Также найти песню можно по названию на английском или по автору!')
     except Exception as e:
+        print(e)
         logging.exception(e)
 
 
@@ -189,20 +192,16 @@ def get_info(my_query):
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         current_date = datetime.date.today()
-        if my_query == 'users':
-            cursor.execute("SELECT MAX(id) FROM users")
-        elif my_query == 'users today':
-            cursor.execute(f"SELECT COUNT(*) FROM users WHERE last_access >= '{current_date}'")
-        elif my_query == 'users month':
-            cursor.execute(f"SELECT COUNT(u.*) FROM users u JOIN periods p ON p.id = '{str(current_date)[:7]}' "
-                           f"WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end")
-        elif my_query == 'queries':
-            cursor.execute("SELECT SUM(cnt_by_content + cnt_by_nums + cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + "
-                           "cnt_by_media_en) FROM metrics")
-        result = cursor.fetchall()
+        cursor.execute(f"SELECT (SELECT COUNT( *) FROM users) AS a, (SELECT COUNT( *) FROM users "
+                       f"WHERE last_access >= current_date) AS b, (SELECT COUNT(u.*) FROM users u JOIN periods p "
+                       f"ON p.id = '{str(current_date)[:7]}' WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end) AS c, "
+                       f"(SELECT SUM(cnt_by_content + cnt_by_nums + cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + "
+                       f"cnt_by_media_en) FROM metrics) AS d")
+        res = cursor.fetchone()
         cursor.close()
         conn.close()
-        return str(result[0][0])
+        result = f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}'
+        return result
     except Exception as e:
         logging.exception(e)
 
