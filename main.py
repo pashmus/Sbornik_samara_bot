@@ -15,7 +15,7 @@ import logging
 import psycopg2
 import datetime
 
-is_remote = False
+is_remote = True  # Переключение БД локальной или удалённой
 config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
 
 token = config['TG_TOKEN']
@@ -43,12 +43,16 @@ async def welcome(message: Message):
 async def search_song(message: Message):
     search_text = message.text.strip().lower()
     if search_text in ('users', 'users today', 'users month', 'queries'):
-        if message.chat.id == '597856040':
+        if message.chat.id == 597856040:
             info = get_info(search_text)
             await message.answer(info)
     elif search_text in ('/c1', '/c2', '/c3', '/sgm', '/gt', '/tr', '/hill', '/kk'):
         content = get_contents(search_text)
-        await message.answer(content)
+        if type(content) is list:
+            for elem in content:
+                await message.answer(elem)
+        else:
+            await message.answer(content)
         metrics('cnt_by_content', message)
     elif search_text.isdigit():  # Если введенное значение является числом
         result = search_song_by_num(search_text)  # Ищем песню по номеру
@@ -126,6 +130,14 @@ def get_contents(c):  # Функция для получения разных с
         if c in ('/c1', '/c2', '/c3'):
             for song in result:
                 song_list += f'{song[0]} - {song[1]}\n'
+        elif c == '/sgm':  # Разбиваем список SGM на два.
+            song_list = ['', '']
+            for i in range(52):
+                song_list[0] += (str(result[i][0]) + ' - ' + result[i][1] + ("" if not result[i][2] else
+                    f'\n        ({result[i][2]})') + ("" if not result[i][3] else f'\n        ({result[i][3]})') + '\n')
+            for i in range(52, len(result)):
+                song_list[1] += (str(result[i][0]) + ' - ' + result[i][1] + ("" if not result[i][2] else
+                    f'\n        ({result[i][2]})') + ("" if not result[i][3] else f'\n        ({result[i][3]})') + '\n')
         else:
             for song in result:
                 song_list += (str(song[0]) + ' - ' + song[1] + ("" if not song[2] else f'\n        ({song[2]})') +
@@ -165,7 +177,6 @@ def search_song_by_text(search_text):  # Функция поиска песни 
         result = cursor.fetchall()
         cursor.close()
         conn.close()
-        print(result)
         return '\n'.join([f'{song[0]} - {song[1]}' for song in result]) if result \
             else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
                   'Также найти песню можно по названию на английском или по автору!')

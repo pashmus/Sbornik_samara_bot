@@ -14,7 +14,7 @@ https://docs.aiogram.dev/en/v3.1.1/api/methods/set_webhook.html
 
 
 
-## Что-то настраивали с Витей
+## Что-то настраивали с Витьком
 ls -al ~/.ssh
 ssh-keygen -t ed25519 -C "forjobav@gmail.com"
 eval "$(ssh-agent -s)"
