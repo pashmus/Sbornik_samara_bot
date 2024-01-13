@@ -15,7 +15,7 @@ import logging
 import psycopg2
 import datetime
 
-is_remote = True  # Переключение БД локальной или удалённой
+is_remote = False  # Переключение БД локальной или удалённой
 config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
 
 token = config['TG_TOKEN']
