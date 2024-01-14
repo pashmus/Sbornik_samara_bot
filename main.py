@@ -155,6 +155,7 @@ def search_song_by_num(song_num):  # Функция поиска песни по
         # cursor.execute(f"UPDATE songs SET cnt_using = cnt_using + 1 WHERE num = {song_num}")
         # cursor.execute(f'SELECT text, en_name, authors FROM songs WHERE num = {song_num}')
         result = cursor.fetchone()
+        conn.commit()
         cursor.close()
         conn.close()
         sep = '___________________________________'
