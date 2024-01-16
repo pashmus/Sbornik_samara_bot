@@ -209,31 +209,18 @@ def get_info(my_query):
 
 def metrics(act, message):  # Аналитика
     try:
-        user_id = message.chat.id
+        user_id, f_name, l_name, username, lang = (message.chat.id, message.from_user.first_name,
+                            message.from_user.last_name, message.from_user.username, message.from_user.language_code)
         current_date = datetime.date.today()  # .isoformat()
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         if act == 'users':  # Запись пользователей в таблицу users
-            cursor.execute(f"WITH updated AS (UPDATE users SET u_cnt_msg = users.u_cnt_msg + 1, "
-                           f"last_access = CAST(NOW() AS TIMESTAMP(0)) + INTERVAL '1 hours' "
-                           f"WHERE telgrm_user_id = {user_id} RETURNING *) "
-                           f"INSERT INTO users (telgrm_user_id, f_name, l_name, username, lang, first_access, last_access, "
-                           f"u_cnt_msg, u_cnt_chords) SELECT {user_id}, '{message.from_user.first_name}', "
-                           f"'{message.from_user.last_name}', '{message.from_user.username}', "
-                           f"'{message.from_user.language_code}', current_date, current_timestamp, 1, 0 "
-                           f"WHERE NOT EXISTS (SELECT 1 FROM updated)")
-            # cursor.execute(f"SELECT telgrm_user_id FROM users WHERE telgrm_user_id = {user_id}")
-            # if cursor.fetchone():  # Если user_id в users есть, то обновляем запись
-            #     cursor.execute(f"UPDATE users SET last_access = CAST(NOW() AS TIMESTAMP(0)) + INTERVAL '1 hours', "
-            #                    f"u_cnt_msg = users.u_cnt_msg + 1 WHERE telgrm_user_id = {user_id}")
-            # else:  # Если нет, то создаём запись
-            #     cursor.execute(f"INSERT INTO users (telgrm_user_id, f_name, l_name, username, lang, first_access, "
-            #                    f"last_access, u_cnt_msg, u_cnt_chords) VALUES ({user_id}, '{message.from_user.first_name}',"
-            #                    f"'{message.from_user.last_name}', '{message.from_user.username}', "
-            #                    f"'{message.from_user.language_code}', current_date, current_timestamp, 1, 0)")
+            cursor.execute(f"INSERT INTO users (telgrm_user_id, f_name, l_name, username, lang) VALUES ({user_id}, "
+                           f"'{f_name}', '{l_name}', '{username}', '{lang}') ON CONFLICT (telgrm_user_id) DO UPDATE "
+                        f"SET u_cnt_msg = users.u_cnt_msg + 1, last_access = current_timestamp(0) + INTERVAL '1 hours'")
         else:  # Запись показателей в таблицу metrics
             cursor.execute(f"SELECT p.id, m.id_period FROM periods p LEFT JOIN metrics m ON p.id = m.id_period "
-                           f"WHERE '{current_date}' BETWEEN p.dt_beg and p.dt_end")
+                           f"WHERE current_date BETWEEN p.dt_beg and p.dt_end")
             id_period = cursor.fetchone()
             if not id_period[1]:  # Если текущего периода в metrics ещё нет, то...
                 id_prev_period = str(datetime.date(current_date.year, current_date.month - 1, 1))[:7] \
@@ -241,9 +228,7 @@ def metrics(act, message):  # Аналитика
                 cursor.execute(f"UPDATE metrics SET cnt_by_users = (SELECT COUNT(u.*) FROM users u JOIN periods p "
                                f"ON p.id = '{id_prev_period}' WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end) "
                                f"WHERE id_period = '{id_prev_period}'")  # Запись кол-ва юзеров в прошлом месяце в metrics
-                cursor.execute(f"INSERT INTO metrics (cnt_by_content, cnt_by_nums, cnt_by_txt, cnt_by_chords, "
-                               f"cnt_by_audio_ru, cnt_by_media_en, cnt_by_users, id_period) "
-                               f"VALUES (0, 0, 0, 0, 0, 0, 0, '{id_period[0]}')")  # Запись новой строки в metrics
+                cursor.execute(f"INSERT INTO metrics (id_period) VALUES ('{id_period[0]}')")  # Запись новой строки в metrics
             if act == 'cnt_by_content':  # Счётчик использования содержания
                 cursor.execute(f"UPDATE metrics SET cnt_by_content=cnt_by_content+1 WHERE id_period = '{id_period[0]}'")
             elif act == 'cnt_by_nums':  # Счётчик поиска по номерам
@@ -252,7 +237,8 @@ def metrics(act, message):  # Аналитика
                 cursor.execute(f"UPDATE metrics SET cnt_by_txt = cnt_by_txt + 1 WHERE id_period = '{id_period[0]}'")
             elif act == 'cnt_by_chords':  # Счётчик нажатия "Аккорды"
                 cursor.execute(f"UPDATE metrics SET cnt_by_chords = cnt_by_chords + 1 WHERE id_period = '{id_period[0]}'")
-                cursor.execute(f"UPDATE users SET u_cnt_chords = u_cnt_chords + 1 WHERE telgrm_user_id = {user_id}")
+                cursor.execute(f"UPDATE users SET u_cnt_chords = u_cnt_chords + 1, "
+                            f"last_access = current_timestamp(0) + INTERVAL '1 hours' WHERE telgrm_user_id = {user_id}")
         conn.commit()
         cursor.close()
         conn.close()
