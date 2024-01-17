@@ -9,8 +9,10 @@ cp .env.example .env
 
 
 
-## Ресурсы по Webhook
+## Ресурсы по aiogram, Webhook, docker etc.
 https://docs.aiogram.dev/en/v3.1.1/api/methods/set_webhook.html
+https://github.com/aiogram/aiogram/tree/dev-3.x/aiogram
+https://github.com/ssharkexe/telegram-nginx-docker-webhook/tree/main
 
 
 
