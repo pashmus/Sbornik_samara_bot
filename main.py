@@ -1,5 +1,6 @@
 
 from dotenv import dotenv_values
+import re
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, InputMediaAudio,
@@ -26,7 +27,7 @@ dp = Dispatcher()
 
 logging.basicConfig(filename='errors.log', level=logging.ERROR,  # Настройки логгирования
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-amount_songs = 369
+amount_songs = 373
 
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
@@ -171,19 +172,20 @@ def search_song_by_num(song_num):  # Функция поиска песни по
 
 def search_song_by_text(search_text):  # Функция поиска песни по фразе
     try:
+        new_txt = '%'.join(re.sub(r'[^\w\s]', '', re.sub(r'ё', 'е', search_text)).split())
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        cursor.execute(f"SELECT num, name FROM songs WHERE REPLACE(text, ',', '') ILIKE '%{search_text.replace(',', '')}%' "
-                       f"OR REPLACE(name, ',', '') ILIKE '%{search_text.replace(',', '')}%' "
-                       f"OR REPLACE(alt_name, ',', '') ILIKE '%{search_text.replace(',', '')}%'"
-                       f"OR REPLACE(en_name, ',', '') ILIKE '%{search_text.replace(',', '')}%' "
-                       f"OR REPLACE(authors, ',', '') ILIKE '%{search_text.replace(',', '')}%'")
+        cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(text, 'ё', 'е') "
+                       f"ILIKE '%{new_txt}%' OR REPLACE(alt_name, 'ё', 'е') ILIKE '%{new_txt}%' "
+                       f"OR en_name ILIKE '%{new_txt}%' OR authors ILIKE '%{new_txt}%'")
         result = cursor.fetchall()
         cursor.close()
         conn.close()
-        return '\n'.join([f'{song[0]} - {song[1]}' for song in result]) if result \
-            else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
-                  'Также найти песню можно по названию на английском или по автору!')
+        song_list = ''
+        for song in result:
+            song_list += (str(song[0]) + ' - ' + song[1] + ("" if not song[2] else f'\n        ({song[2]})') +
+                          ("" if not song[3] else f'\n        ({song[3]})') + '\n')
+        return song_list[:4088] + '...\n...' if len(song_list) > 4094 else song_list
     except Exception as e:
         logging.exception(e)
 
