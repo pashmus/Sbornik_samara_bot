@@ -46,7 +46,7 @@ async def search_song(message: Message):
     if search_text == 'users' and message.chat.id == 597856040:
         info = get_info(search_text)
         await message.answer(info)
-    elif search_text in ('/c1', '/c2', '/c3', '/sgm', '/gt', '/tr', '/hill', '/kk'):
+    elif search_text in ('/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk'):
         content = get_contents(search_text)
         if type(content) is list:
             for elem in content:
@@ -100,11 +100,13 @@ def get_contents(c):  # Функция для получения разных с
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         if c == '/c1':
-            cursor.execute("SELECT num, name FROM songs WHERE num < 150 ORDER BY num")
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num < 101 ORDER BY num")
         elif c == '/c2':
-            cursor.execute("SELECT num, name FROM songs WHERE num BETWEEN 151 and 290 ORDER BY num")
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 101 and 200 ORDER BY num")
         elif c == '/c3':
-            cursor.execute("SELECT num, name FROM songs WHERE num > 290 ORDER BY num")
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 201 and 300 ORDER BY num")
+        elif c == '/c4':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num > 300 ORDER BY num")
         # elif c == '/ch':
         #     cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num = ANY(string_to_array(("
         #                    "SELECT song_nums FROM themes WHERE theme = 'Рождество Христа'), ', ')::int[]) ORDER BY num")
@@ -126,19 +128,16 @@ def get_contents(c):  # Функция для получения разных с
         result = cursor.fetchall()
         cursor.close()
         conn.close()
-        song_list = ''
-        if c in ('/c1', '/c2', '/c3'):
-            for song in result:
-                song_list += f'{song[0]} - {song[1]}\n'
-        elif c == '/sgm':  # Разбиваем список SGM на два.
+        if c in ('/c1', '/c2', '/c3', '/c4', '/sgm'):  # Разбиваем список на два
             song_list = ['', '']
-            for i in range(52):
+            for i in range(50):
                 song_list[0] += (str(result[i][0]) + ' - ' + result[i][1] + ("" if not result[i][2] else
                     f'\n        ({result[i][2]})') + ("" if not result[i][3] else f'\n        ({result[i][3]})') + '\n')
-            for i in range(52, len(result)):
+            for i in range(50, len(result)):
                 song_list[1] += (str(result[i][0]) + ' - ' + result[i][1] + ("" if not result[i][2] else
                     f'\n        ({result[i][2]})') + ("" if not result[i][3] else f'\n        ({result[i][3]})') + '\n')
         else:
+            song_list = ''
             for song in result:
                 song_list += (str(song[0]) + ' - ' + song[1] + ("" if not song[2] else f'\n        ({song[2]})') +
                               ("" if not song[3] else f'\n        ({song[3]})') + '\n')
