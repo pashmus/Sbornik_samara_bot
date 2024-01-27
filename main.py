@@ -1,7 +1,7 @@
 
 from dotenv import dotenv_values
 import re
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, InputMediaAudio,
                            InputMediaDocument, InputMediaPhoto,
@@ -11,7 +11,6 @@ from aiogram.filters import CommandStart
 from aiogram.filters.command import Command
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.methods.send_photo import SendPhoto
-
 import logging
 import psycopg2
 import datetime
@@ -25,8 +24,8 @@ host, user, password, database = config['HOST'], config['USER'], config['PASSWOR
 bot = Bot(token=token)  # AVP TEST
 dp = Dispatcher()
 
-logging.basicConfig(filename='errors.log', level=logging.ERROR,  # Настройки логгирования
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='errors.log', level=logging.ERROR,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
 amount_songs = 375
 
 @dp.message(CommandStart())  # Обработчик команды /start
@@ -40,63 +39,28 @@ async def welcome(message: Message):
         logging.exception(e)
 
 
-@dp.message()  # Обработчик текстовых сообщений
-async def search_song(message: Message):
-    search_text = message.text.strip().lower()
-    if search_text == 'users' and message.chat.id == 597856040:
-        info = get_info(search_text)
-        await message.answer(info)
-    elif search_text in ('/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk'):
-        content = get_contents(search_text)
-        if type(content) is list:
-            for elem in content:
-                await message.answer(elem)
-        else:
-            await message.answer(content)
-        metrics('cnt_by_content', message)
-    elif search_text.isdigit():  # Если введенное значение является числом
-        result = search_song_by_num(search_text)  # Ищем песню по номеру
-        if int(search_text) <= amount_songs:
-            global num_song
-            num_song = int(search_text)
-            chords_butt = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
-            keyword = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
-            await message.answer(result, reply_markup=keyword)
-        else:
-            await message.answer(text=result, show_alert=True)
-        metrics('cnt_by_nums', message)
-    else:
-        if len(search_text) < 4:
-            await message.answer('Запрос должен содержать более 3 символов.')
-        else:
-            result = search_song_by_text(search_text)  # Ищем песню по тексту
-            await message.answer(result)
-        metrics('cnt_by_txt', message)
-    metrics('users', message)
-
-
-@dp.callback_query(F.data == 'Chords')  # Обработчик нажатия кнопки "Аккорды"
-async def on_click_chords(callback: CallbackQuery):
+@dp.message((F.text.strip().lower() == 'admin') & (F.from_user.id == int(config['my_tlgrm_id'])))
+async def get_users_info(message: Message):
     try:
-        file = FSInputFile(f'Chords_jpg/{num_song}.jpg')
-        await bot.send_photo(chat_id=callback.message.chat.id, photo=file)
-        metrics('cnt_by_chords', callback.message)
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT (SELECT COUNT( *) FROM users) AS a, (SELECT COUNT( *) FROM users "
+                       f"WHERE last_access >= current_date) AS b, (SELECT COUNT(u.*) FROM users u JOIN periods p "
+                       f"ON p.id = TO_CHAR(current_date, 'YYYY-MM') WHERE u.last_access "
+                       f"BETWEEN p.dt_beg AND p.dt_end) AS c, (SELECT SUM(cnt_by_content + cnt_by_nums + "
+                       f"cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + cnt_by_media_en) FROM metrics) AS d")
+        res = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
     except Exception as e:
         logging.exception(e)
 
 
-# @dp.message()  # Обработчик ошибок
-# async def handle_all_messages(message):
-#     while True:
-#         try:
-#             search_song(message)
-#             break
-#         except Exception as e:
-#             logging.exception(e)
-
-
-def get_contents(c):  # Функция для получения разных списков песен
+@dp.message(F.text.in_({'/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk'}))  # Обработчик содержания
+async def get_contents(message: Message):  # Функция для получения разных списков песен
     try:
+        c = message.text
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         if c == '/c1':
@@ -125,85 +89,89 @@ def get_contents(c):  # Функция для получения разных с
         elif c == '/kk':
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Краеугольный Камень%' ORDER BY num")
-        result = cursor.fetchall()
+        res = cursor.fetchall()
         cursor.close()
         conn.close()
         if c in ('/c1', '/c2', '/c3', '/c4', '/sgm'):  # Разбиваем список на два
-            song_list = ['', '']
+            content = ['', '']
             for i in range(50):
-                song_list[0] += (str(result[i][0]) + ' - ' + result[i][1] + ("" if not result[i][2] else
-                    f'\n        ({result[i][2]})') + ("" if not result[i][3] else f'\n        ({result[i][3]})') + '\n')
-            for i in range(50, len(result)):
-                song_list[1] += (str(result[i][0]) + ' - ' + result[i][1] + ("" if not result[i][2] else
-                    f'\n        ({result[i][2]})') + ("" if not result[i][3] else f'\n        ({result[i][3]})') + '\n')
+                content[0] += (str(res[i][0]) + ' - ' + res[i][1] + ("" if not res[i][2] else
+                    f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})') + '\n')
+            for i in range(50, len(res)):
+                content[1] += (str(res[i][0]) + ' - ' + res[i][1] + ("" if not res[i][2] else
+                    f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})') + '\n')
+            for elem in content:
+                await message.answer(elem)
         else:
-            song_list = ''
-            for song in result:
-                song_list += (str(song[0]) + ' - ' + song[1] + ("" if not song[2] else f'\n        ({song[2]})') +
+            content = ''
+            for song in res:
+                content += (str(song[0]) + ' - ' + song[1] + ("" if not song[2] else f'\n        ({song[2]})') +
                               ("" if not song[3] else f'\n        ({song[3]})') + '\n')
-        return song_list
+            await message.answer(content)
+        metrics('cnt_by_content', message)
+        metrics('users', message)
     except Exception as e:
         logging.exception(e)
 
 
-def search_song_by_num(song_num):  # Функция поиска песни по номеру
+@dp.message(F.text.isdigit())  # Обработчик номеров песен
+async def search_song_by_num(message: Message):
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        cursor.execute(f"UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {song_num} "
+        cursor.execute(f"UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {message.text} "
                        f"RETURNING text, en_name, authors")
-        # cursor.execute(f"UPDATE songs SET cnt_using = cnt_using + 1 WHERE num = {song_num}")
-        # cursor.execute(f'SELECT text, en_name, authors FROM songs WHERE num = {song_num}')
         result = cursor.fetchone()
         conn.commit()
         cursor.close()
         conn.close()
         sep = '___________________________________'
         if result:
-            return f'{result[0]}\n{sep}\n{result[1] if result[1] else ""}\n{result[2] if result[2] else ""}'
+            global num_song
+            num_song = int(message.text)
+            chords_butt = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
+            keyword = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
+            await message.answer(f'{result[0]}\n{sep}\n{result[1] if result[1] else ""}\n'
+                                 f'{result[2] if result[2] else ""}', reply_markup=keyword)
         else:
-            return (f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или фразу из песни. '
-                    f'Также найти песню можно по названию на английском или по автору!')
+            await message.answer(f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
+                                 f'фразу из песни. Также найти песню можно по названию на английском или по автору!')
+        metrics('cnt_by_nums', message)
+        metrics('users', message)
     except Exception as e:
-        print(e)
+        logging.exception(e)
+
+@dp.callback_query(F.data == 'Chords')  # Обработчик нажатия кнопки "Аккорды"
+async def on_click_chords(callback: CallbackQuery):
+    try:
+        file = FSInputFile(f'Chords_jpg/{num_song}.jpg')
+        await bot.send_photo(chat_id=callback.message.chat.id, photo=file)
+        metrics('cnt_by_chords', callback.message)
+    except Exception as e:
         logging.exception(e)
 
 
-def search_song_by_text(search_text):  # Функция поиска песни по фразе
+@dp.message(F.text)  # Обработчик поиска по фразе
+async def search_song_by_text(message: Message):
     try:
-        new_txt = '%'.join(re.sub(r'[^\w\s]', '', re.sub(r'ё', 'е', search_text)).split())
+        new_txt = '%'.join(re.sub(r'[^\w\s]', '', re.sub(r'ё', 'е', message.text.lower())).split())
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(text, 'ё', 'е') "
                        f"ILIKE '%{new_txt}%' OR REPLACE(alt_name, 'ё', 'е') ILIKE '%{new_txt}%' "
-                       f"OR en_name ILIKE '%{new_txt}%' OR authors ILIKE '%{new_txt}%'")
+                       f"OR en_name ILIKE '%{new_txt}%' OR authors ILIKE '%{new_txt}%' ORDER BY num")
         result = cursor.fetchall()
         cursor.close()
         conn.close()
-        song_list = ''
-        for song in result:
+        song_list = '' if result else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
+                                       'Также найти песню можно по названию на английском или по автору!')
+        for song in result[0:50]:
             song_list += (str(song[0]) + ' - ' + song[1] + ("" if not song[2] else f'\n        ({song[2]})') +
                           ("" if not song[3] else f'\n        ({song[3]})') + '\n')
-        return song_list[:4088] + '...\n...' if len(song_list) > 4094 else song_list
-    except Exception as e:
-        logging.exception(e)
-
-
-def get_info(my_query):
-    try:
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
-        cursor = conn.cursor()
-        current_date = datetime.date.today()
-        cursor.execute(f"SELECT (SELECT COUNT( *) FROM users) AS a, (SELECT COUNT( *) FROM users "
-                       f"WHERE last_access >= current_date) AS b, (SELECT COUNT(u.*) FROM users u JOIN periods p "
-                       f"ON p.id = '{str(current_date)[:7]}' WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end) AS c, "
-                       f"(SELECT SUM(cnt_by_content + cnt_by_nums + cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + "
-                       f"cnt_by_media_en) FROM metrics) AS d")
-        res = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        result = f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}'
-        return result
+        await message.answer(song_list + f'\n\n# Показаны только первые 50 из {len(result)} найденных песен. '
+                                         f'Сформулируйте запрос точнее. #' if len(result) > 50 else song_list)
+        metrics('cnt_by_txt', message)
+        metrics('users', message)
     except Exception as e:
         logging.exception(e)
 
