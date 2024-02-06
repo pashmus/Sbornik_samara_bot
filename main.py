@@ -14,6 +14,7 @@ from aiogram.methods.send_photo import SendPhoto
 import logging
 import psycopg2
 import datetime
+from aiogram.enums import ParseMode
 
 is_remote = False  # Переключение БД локальной или удалённой
 config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
@@ -125,14 +126,14 @@ async def search_song_by_num(message: Message):
         conn.commit()
         cursor.close()
         conn.close()
-        sep = '___________________________________'
+        sep = '____________________________'
         if result:
             global num_song
             num_song = int(message.text)
             chords_butt = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
             keyword = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
-            await message.answer(f'{result[0]}\n{sep}\n{result[1] if result[1] else ""}\n'
-                                 f'{result[2] if result[2] else ""}', reply_markup=keyword)
+            await message.answer(f'{result[0]}\n{sep}\n<b>{result[1] if result[1] else ""}</b>\n'
+                            f'<i>{result[2] if result[2] else ""}</i>', parse_mode=ParseMode.HTML, reply_markup=keyword)
         else:
             await message.answer(f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
                                  f'фразу из песни. Также найти песню можно по названию на английском или по автору!')
@@ -154,12 +155,12 @@ async def on_click_chords(callback: CallbackQuery):
 @dp.message(F.text)  # Обработчик поиска по фразе
 async def search_song_by_text(message: Message):
     try:
-        new_txt = '%'.join(re.sub(r'[^\w\s]', '', re.sub(r'ё', 'е', message.text.lower())).split())
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(text, 'ё', 'е') "
-                       f"ILIKE '%{new_txt}%' OR REPLACE(alt_name, 'ё', 'е') ILIKE '%{new_txt}%' "
-                       f"OR en_name ILIKE '%{new_txt}%' OR authors ILIKE '%{new_txt}%' ORDER BY num")
+        cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(name || ' ' || "
+                       f"COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || "
+                       f"COALESCE(authors, ''), 'ё', 'е') @@ PHRASETO_TSQUERY(REPLACE('{message.text}', 'ё', 'е')) "
+                       f"ORDER BY num")
         result = cursor.fetchall()
         cursor.close()
         conn.close()

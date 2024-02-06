@@ -69,3 +69,5 @@ exit
 nano /etc/postgresql/16/main/postgresql.conf
 nano /etc/postgresql/14/main/pg_hba.conf
 systemctl restart postgresql   # Для рестарта БД достаточно одной команды
+pg_dump -h localhost -U "userdb" -d "namedb" > sb_20240131.sql  # Бэкап в формате SQL (всё без кавычек)
+pg_dump -h localhost -U "userdb" -d "namedb" -Fc > sb_20240131.backup  # Бэкап в формате .backup 
