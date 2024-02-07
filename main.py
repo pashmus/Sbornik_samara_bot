@@ -132,8 +132,8 @@ async def search_song_by_num(message: Message):
             num_song = int(message.text)
             chords_butt = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
             keyword = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
-            await message.answer(f'{result[0]}\n{sep}\n<b>{result[1] if result[1] else ""}</b>\n'
-                            f'<i>{result[2] if result[2] else ""}</i>', parse_mode=ParseMode.HTML, reply_markup=keyword)
+            await message.answer(result[0] + '\n' + sep + (f'\n<b>{result[1]}</b>' if result[1] else "") +
+                        (f'\n<i>{result[2]}</i>' if result[2] else ""), parse_mode=ParseMode.HTML, reply_markup=keyword)
         else:
             await message.answer(f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
                                  f'фразу из песни. Также найти песню можно по названию на английском или по автору!')
