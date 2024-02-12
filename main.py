@@ -121,19 +121,18 @@ async def search_song_by_num(message: Message):
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {message.text} "
-                       f"RETURNING text, en_name, authors")
+                       f"RETURNING num, alt_name, text, en_name, authors")
         result = cursor.fetchone()
         conn.commit()
         cursor.close()
         conn.close()
         sep = '____________________________'
         if result:
-            global num_song
-            num_song = int(message.text)
             chords_butt = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
-            keyword = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
-            await message.answer(result[0] + '\n' + sep + (f'\n<b>{result[1]}</b>' if result[1] else "") +
-                        (f'\n<i>{result[2]}</i>' if result[2] else ""), parse_mode=ParseMode.HTML, reply_markup=keyword)
+            kb = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
+            await message.answer(f'<i>{result[0]}</i>' + (f'  <b>{result[1]}</b>\n\n' if result[1] else '\n\n') +
+                            result[2] + '\n' + sep + (f'\n<b>{result[3]}</b>' if result[3] else '') +
+                            (f'\n<i>{result[4]}</i>' if result[4] else ''), parse_mode=ParseMode.HTML, reply_markup=kb)
         else:
             await message.answer(f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
                                  f'фразу из песни. Также найти песню можно по названию на английском или по автору!')
@@ -145,7 +144,8 @@ async def search_song_by_num(message: Message):
 @dp.callback_query(F.data == 'Chords')  # Обработчик нажатия кнопки "Аккорды"
 async def on_click_chords(callback: CallbackQuery):
     try:
-        file = FSInputFile(f'Chords_jpg/{num_song}.jpg')
+        num = callback.message.text.split()[0]
+        file = FSInputFile(f'Chords_jpg/{num}.jpg')
         await bot.send_photo(chat_id=callback.message.chat.id, photo=file)
         metrics('cnt_by_chords', callback.message)
     except Exception as e:
