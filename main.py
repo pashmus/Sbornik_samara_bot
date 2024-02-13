@@ -128,8 +128,8 @@ async def search_song_by_num(message: Message):
         conn.close()
         sep = '____________________________'
         if result:
-            chords_butt = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
-            kb = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
+            chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
+            kb = InlineKeyboardMarkup(inline_keyboard=[[chords_btn]])
             await message.answer(f'<i>{result[0]}</i>' + (f'  <b>{result[1]}</b>\n\n' if result[1] else '\n\n') +
                             result[2] + '\n' + sep + (f'\n<b>{result[3]}</b>' if result[3] else '') +
                             (f'\n<i>{result[4]}</i>' if result[4] else ''), parse_mode=ParseMode.HTML, reply_markup=kb)
