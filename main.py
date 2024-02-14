@@ -115,35 +115,99 @@ async def get_contents(message: Message):  # Функция для получе�
         logging.exception(e)
 
 
+# favorite_btn_off = InlineKeyboardButton(text='🤍', callback_data='favorites')
+# favorite_btn_on = InlineKeyboardButton(text='❤️', callback_data='favorites')
+# chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
+# audio_btn = InlineKeyboardButton(text='Аудио', callback_data='audio')
+# youtube_btn = InlineKeyboardButton(text='YouTube', callback_data='YouTube')
+# kb1 = InlineKeyboardMarkup(inline_keyboard=[[favorite_btn_off, chords_btn], [audio_btn, youtube_btn]])
+# kb2 = InlineKeyboardMarkup(inline_keyboard=[[favorite_btn_on, chords_btn], [audio_btn, youtube_btn]])
+# kb3 = InlineKeyboardMarkup(inline_keyboard=[[favorite_btn_on, chords_btn], [audio_btn]])
+# kb4 = InlineKeyboardMarkup(inline_keyboard=[[favorite_btn_on, chords_btn]])
+
+
 @dp.message(F.text.isdigit())  # Обработчик номеров песен
 async def search_song_by_num(message: Message):
     try:
+        num = message.text
+        tg_user_id = message.from_user.id
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        cursor.execute(f"UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {message.text} "
-                       f"RETURNING text, en_name, authors")
+        cursor.execute(f"WITH upd_song AS (UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {num} "
+                       f"RETURNING num, alt_name, text, en_name, authors, chords_tg_file_id, audio_tg_file_id, "
+                       f"youtube_url) SELECT upd_song.*, EXISTS(SELECT 1 FROM user_song_link "
+                       f"WHERE tg_user_id = {tg_user_id} AND song_num = {num}) FROM upd_song")
         result = cursor.fetchone()
         conn.commit()
         cursor.close()
         conn.close()
         sep = '____________________________'
         if result:
-            chords_butt = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
-            kb = InlineKeyboardMarkup(inline_keyboard=[[chords_butt]])
-            await message.answer(result[0] + '\n' + sep + (f'\n<b>{result[1]}</b>' if result[1] else "") +
-                        (f'\n<i>{result[2]}</i>' if result[2] else ""), parse_mode=ParseMode.HTML, reply_markup=kb)
+            fav_sign = '❤️' if result[8] else '🤍'  # 💛 💜 🩶
+            favorites_btn = InlineKeyboardButton(text=fav_sign, callback_data='favorites')
+            chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
+            audio_btn = InlineKeyboardButton(text='Аудио', callback_data='audio')
+            youtube_btn = InlineKeyboardButton(text='YouTube', url=result[7])
+            lower_row = [audio_btn, youtube_btn]
+            kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn], [*lower_row]])
+            # if result[7]:
+            #     kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn], [audio_btn, youtube_btn]])
+            # else:
+            #     kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn], [audio_btn]])
+            await message.answer(f'<i>{result[0]}</i>' + (f'  <b>{result[1]}</b>\n\n' if result[1] else '\n\n') +
+                            result[2] + '\n' + sep + (f'\n<b>{result[3]}</b>' if result[3] else '') +
+                            (f'\n<i>{result[4]}</i>' if result[4] else ''), parse_mode=ParseMode.HTML, reply_markup=kb)
         else:
             await message.answer(f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
                                  f'фразу из песни. Также найти песню можно по названию на английском или по автору!')
         metrics('cnt_by_nums', message)
         metrics('users', message)
     except Exception as e:
+        print(e)
         logging.exception(e)
+
+
+@dp.callback_query(F.data == 'favorites')  # Обработчик нажатия кнопки '🤍'
+async def on_click_favorites(callback: CallbackQuery):
+    try:
+        song_exist = callback.message.reply_markup.inline_keyboard[0][0].text == '❤️'
+        tg_user_id = callback.from_user.id
+        num = callback.message.text.split()[0]
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM user_song_link WHERE tg_user_id={tg_user_id}")
+        user_exist = cursor.fetchone()
+        if song_exist:
+            cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id} AND song_num = {num}")
+        else:
+            cursor.execute(f"INSERT INTO user_song_link VALUES ({tg_user_id}, {num})")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        fav_sign = '🤍' if song_exist else '❤️'
+        favorites_btn = InlineKeyboardButton(text=fav_sign, callback_data='favorites')
+        chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
+        audio_btn = InlineKeyboardButton(text='Аудио', callback_data='audio')
+        youtube_btn = InlineKeyboardButton(text='YouTube', callback_data='YouTube')
+        kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn], [audio_btn, youtube_btn]])
+        if song_exist:
+            await callback.answer(text='Песня удалена из избранного.')
+        else:
+            if user_exist:
+                await callback.answer(text='Песня добавлена в Избранное!')
+            else:
+                await callback.answer(text='Песня добавлена в Избранное!\n'
+                                           'Весь список с Избранным можно вывести через меню.', show_alert=True)
+        await callback.message.edit_reply_markup(reply_markup=kb)
+    except Exception as e:
+        print(e)
+        # logging.exception(e)
+
 
 @dp.callback_query(F.data == 'Chords')  # Обработчик нажатия кнопки "Аккорды"
 async def on_click_chords(callback: CallbackQuery):
     try:
-        num = 5
+        num = callback.message.text.split()[0]
         file = FSInputFile(f'Chords_jpg/{num}.jpg')
         await bot.send_photo(chat_id=callback.message.chat.id, photo=file)
         metrics('cnt_by_chords', callback.message)
