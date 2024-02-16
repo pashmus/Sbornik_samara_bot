@@ -90,7 +90,7 @@ async def get_contents(message: Message):  # Функция для получе�
         elif c == '/kk':
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Краеугольный Камень%' ORDER BY num")
-        elif c== '/fav':
+        elif c == '/fav':
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
                            f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
         res = cursor.fetchall()
@@ -109,6 +109,7 @@ async def get_contents(message: Message):  # Функция для получе�
         metrics('cnt_by_content', message)
         metrics('users', message)
     except Exception as e:
+        print(e)
         logging.exception(e)
 
 
