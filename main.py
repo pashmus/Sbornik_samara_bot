@@ -22,7 +22,7 @@ config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
 token = config['TG_TOKEN']
 host, user, password, database = config['HOST'], config['USER'], config['PASSWORD'], config['DATABASE']
 
-bot = Bot(token=token)  # AVP TEST
+bot = Bot(token=token)
 dp = Dispatcher()
 
 logging.basicConfig(filename='errors.log', level=logging.ERROR,
@@ -40,22 +40,32 @@ async def welcome(message: Message):
         logging.exception(e)
 
 
-@dp.message((F.text.strip().lower() == 'admin') & (F.from_user.id == int(config['my_tlgrm_id'])))
+@dp.message(((F.text.strip().lower() == 'admin') | (F.text.lower().startswith('select'))) &
+            (F.from_user.id == int(config['my_tlgrm_id'])))
 async def get_users_info(message: Message):
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        cursor.execute(f"SELECT (SELECT COUNT( *) FROM users) AS a, (SELECT COUNT( *) FROM users "
-                       f"WHERE last_access >= current_date) AS b, (SELECT COUNT(u.*) FROM users u JOIN periods p "
-                       f"ON p.id = TO_CHAR(current_date, 'YYYY-MM') WHERE u.last_access "
-                       f"BETWEEN p.dt_beg AND p.dt_end) AS c, (SELECT SUM(cnt_by_content + cnt_by_nums + "
-                       f"cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + cnt_by_media_en) FROM metrics) AS d")
-        res = cursor.fetchone()
+        if message.text.strip().lower() == 'admin':
+            cursor.execute(f"SELECT (SELECT COUNT( *) FROM users) AS a, (SELECT COUNT( *) FROM users "
+                           f"WHERE last_access >= current_date) AS b, (SELECT COUNT(u.*) FROM users u JOIN periods p "
+                           f"ON p.id = TO_CHAR(current_date, 'YYYY-MM') WHERE u.last_access "
+                           f"BETWEEN p.dt_beg AND p.dt_end) AS c, (SELECT SUM(cnt_by_content + cnt_by_nums + "
+                           f"cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + cnt_by_media_en) FROM metrics) AS d")
+            res = cursor.fetchone()
+            await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
+        else:
+            cursor.execute("SELECT table_name, string_agg(column_name, ', ') AS columns_list FROM "
+                     "information_schema.columns WHERE table_name IN ('songs', 'metrics', 'users') GROUP BY table_name")
+            tbl_names = cursor.fetchall()
+            cursor.execute(f"{message.text}")
+            my_select = cursor.fetchall()
+            output = '\n'.join(str(elem) for elem in tbl_names) + '\n\n' + '\n'.join(str(elem) for elem in my_select)
+            await message.answer(output)
         cursor.close()
         conn.close()
-        await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
     except Exception as e:
-        logging.exception(e)
+        await message.answer(str(e))
 
 
 @dp.message(F.text.in_({'/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk', '/fav'}))  # Обработчик содержания
@@ -109,7 +119,6 @@ async def get_contents(message: Message):  # Функция для получе�
         metrics('cnt_by_content', message)
         metrics('users', message)
     except Exception as e:
-        print(e)
         logging.exception(e)
 
 
