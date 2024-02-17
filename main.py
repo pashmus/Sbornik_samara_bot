@@ -130,7 +130,7 @@ async def search_song_by_num(message: Message):
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"WITH upd_song AS (UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {num} "
-                       f"RETURNING num, alt_name, text, en_name, authors, chords_tg_file_id, audio_tg_file_id, "
+                       f"RETURNING num, alt_name, text, en_name, authors, chords_file_id, audio_file_id, "
                        f"youtube_url) SELECT upd_song.*, EXISTS(SELECT 1 FROM user_song_link "
                        f"WHERE tg_user_id = {tg_user_id} AND song_num = {num}) FROM upd_song")
         result = cursor.fetchone()
@@ -193,8 +193,20 @@ async def on_click_favorites(callback: CallbackQuery):
 async def on_click_chords(callback: CallbackQuery):
     try:
         num = callback.message.text.split()[0]
-        file = FSInputFile(f'Chords_jpg/{num}.jpg')
-        await bot.send_photo(chat_id=callback.message.chat.id, photo=file)
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT chords_file_id FROM songs where num = {num}")
+        chords_file_id = cursor.fetchone()[0]
+        if chords_file_id:
+            await bot.send_photo(chat_id=callback.message.chat.id, photo=chords_file_id, caption=num)
+        else:
+            file = FSInputFile(f'Chords_jpg/{num}.jpg')
+            photo_info = await bot.send_photo(chat_id=callback.message.chat.id, photo=file, caption=num)
+            file_id = photo_info.photo[-1].file_id
+            cursor.execute(f"UPDATE songs SET chords_file_id = '{file_id}' WHERE num = {num}")
+            conn.commit()
+        cursor.close()
+        conn.close()
         metrics('cnt_by_chords', callback.message)
     except Exception as e:
         logging.exception(e)
