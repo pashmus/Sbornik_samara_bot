@@ -1,6 +1,4 @@
-
 from dotenv import dotenv_values
-import re
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, InputMediaAudio,
@@ -29,13 +27,15 @@ logging.basicConfig(filename='errors.log', level=logging.ERROR,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
 amount_songs = 376
 
+
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
     try:
-        await message.answer(text='Добро пожаловать! Отправь боту номер песни или фразу из песни. Также найти песню '
-                                  'можно по названию на английском или по автору! А ещё, выбрав пункт МЕНЮ, ты сможешь '
-                                  'сформировать список песен по некоторым авторам или по содержанию.')
-        metrics('users', message)
+        await message.answer(text='<b>Добро пожаловать!</b>\nОтправь боту номер песни или фразу из песни. Также найти '
+                            'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
+                            'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
+                             parse_mode=ParseMode.HTML)
+        metrics('users', message.from_user)
     except Exception as e:
         logging.exception(e)
 
@@ -55,12 +55,9 @@ async def get_users_info(message: Message):
             res = cursor.fetchone()
             await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
         else:
-            cursor.execute("SELECT table_name, string_agg(column_name, ', ') AS columns_list FROM "
-                     "information_schema.columns WHERE table_name IN ('songs', 'metrics', 'users') GROUP BY table_name")
-            tbl_names = cursor.fetchall()
             cursor.execute(f"{message.text}")
             my_select = cursor.fetchall()
-            output = '\n'.join(str(elem) for elem in tbl_names) + '\n\n' + '\n'.join(str(elem) for elem in my_select)
+            output = '\n'.join(str(elem) for elem in my_select)
             await message.answer(output)
         cursor.close()
         conn.close()
@@ -108,16 +105,16 @@ async def get_contents(message: Message):  # Функция для получе�
         conn.close()
         content = ['', '']
         for i in range(50 if len(res) > 50 else len(res)):
-            content[0] += (str(res[i][0]) + ' - ' + res[i][1] + ("" if not res[i][2] else
-                            f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})') + '\n')
+            content[0] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                           f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
         for i in range(50, len(res)):
-            content[1] += (str(res[i][0]) + ' - ' + res[i][1] + ("" if not res[i][2] else
-                            f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})') + '\n')
+            content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                           f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
         for elem in content:
             if elem:
                 await message.answer(elem)
-        metrics('cnt_by_content', message)
-        metrics('users', message)
+        metrics('cnt_by_content', message.from_user)
+        metrics('users', message.from_user)
     except Exception as e:
         logging.exception(e)
 
@@ -126,7 +123,31 @@ async def get_contents(message: Message):  # Функция для получе�
 async def search_song_by_num(message: Message):
     try:
         num = message.text
-        tg_user_id = message.from_user.id
+        result = await return_song(num, message.from_user.id)
+        if result[0]:
+            await message.answer(result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
+        else:
+            await message.answer(result[1])
+        metrics('cnt_by_nums', message.from_user)
+        metrics('users', message.from_user)
+    except Exception as e:
+        logging.exception(e)
+
+
+@dp.callback_query(F.data.isdigit())  # Обработчик нажатия на кнопку с номером песни
+async def on_click_song(callback: CallbackQuery):
+    try:
+        num = callback.data
+        result = await return_song(num, callback.from_user.id)
+        await bot.send_message(chat_id=callback.message.chat.id, text=result[1], parse_mode=ParseMode.HTML,
+                               reply_markup=result[2])
+        await callback.answer()
+    except Exception as e:
+        logging.exception(e)
+
+
+async def return_song(num, tg_user_id):
+    try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"WITH upd_song AS (UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {num} "
@@ -143,14 +164,12 @@ async def search_song_by_num(message: Message):
             favorites_btn = InlineKeyboardButton(text=fav_sign, callback_data='favorites')
             chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
             kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn]])
-            await message.answer(f'<i>{result[0]}</i>' + (f'  <b>{result[1]}</b>\n\n' if result[1] else '\n\n') +
-                            result[2] + '\n' + sep + (f'\n<b>{result[3]}</b>' if result[3] else '') +
-                            (f'\n<i>{result[4]}</i>' if result[4] else ''), parse_mode=ParseMode.HTML, reply_markup=kb)
+            return [True, (f'<i>{result[0]}</i>' + (f'  <b>{result[1]}</b>\n\n' if result[1] else '\n\n') +
+                           f'{result[2]}\n{sep}' + (f'\n<b>{result[3]}</b>' if result[3] else '') +
+                           (f'\n<i>{result[4]}</i>' if result[4] else '')), kb]
         else:
-            await message.answer(f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
-                                 f'фразу из песни. Также найти песню можно по названию на английском или по автору!')
-        metrics('cnt_by_nums', message)
-        metrics('users', message)
+            return [False, (f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
+                            f'фразу из песни. Также найти песню можно по названию на английском или по автору!')]
     except Exception as e:
         logging.exception(e)
 
@@ -183,7 +202,7 @@ async def on_click_favorites(callback: CallbackQuery):
                 await callback.answer(text='Песня добавлена в Избранное!')
             else:
                 await callback.answer(text='Песня добавлена в Избранное!\n'
-                                           'Весь список с Избранным можно вывести через меню.', show_alert=True)
+                                           'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
         logging.exception(e)
@@ -207,7 +226,8 @@ async def on_click_chords(callback: CallbackQuery):
             conn.commit()
         cursor.close()
         conn.close()
-        metrics('cnt_by_chords', callback.message)
+        metrics('cnt_by_chords', callback.from_user)
+        await callback.answer()
     except Exception as e:
         logging.exception(e)
 
@@ -226,21 +246,33 @@ async def search_song_by_text(message: Message):
         conn.close()
         song_list = '' if result else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
                                        'Также найти песню можно по названию на английском или по автору!')
-        for song in result[0:50]:
-            song_list += (str(song[0]) + ' - ' + song[1] + ("" if not song[2] else f'\n        ({song[2]})') +
-                          ("" if not song[3] else f'\n        ({song[3]})') + '\n')
-        await message.answer(song_list + f'\n\n# Показаны только первые 50 из {len(result)} найденных песен. '
-                                         f'Сформулируйте запрос точнее. #' if len(result) > 50 else song_list)
-        metrics('cnt_by_txt', message)
-        metrics('users', message)
+        for song in result[0:10]:
+            song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f'\n        ({song[2]})') +
+                          ("" if not song[3] else f'\n        ({song[3]})'))
+        num_buttons = {str(num[0]): str(num[0]) for num in result[0:10]}
+        kb = create_inline_kb(8, **num_buttons)  # Вызываем функцию строителя кнопок
+        await message.answer(song_list + f'\n\n# Показаны только первые 10 из {len(result)} найденных песен. '
+                                f'Сформулируйте запрос точнее. #' if len(result) > 10 else song_list, reply_markup=kb)
+        metrics('cnt_by_txt', message.from_user)
+        metrics('users', message.from_user)
     except Exception as e:
         logging.exception(e)
 
 
-def metrics(act, message):  # Аналитика
+def create_inline_kb(width: int, *args: str, **kwargs: str) -> InlineKeyboardMarkup:
+    kb_builder = InlineKeyboardBuilder()
+    buttons: list[InlineKeyboardButton] = []
+    if kwargs:
+        for btn, txt in kwargs.items():
+            buttons.append(InlineKeyboardButton(text=txt, callback_data=btn))
+    kb_builder.row(*buttons, width=width)
+    return kb_builder.as_markup()
+
+
+def metrics(act, user_info):  # Аналитика
     try:
-        user_id, f_name, l_name, username, lang = (message.chat.id, message.from_user.first_name,
-                            message.from_user.last_name, message.from_user.username, message.from_user.language_code)
+        user_id, f_name, l_name, username, lang = (user_info.id, user_info.first_name, user_info.last_name,
+                                                   user_info.username, user_info.language_code)
         current_date = datetime.date.today()  # .isoformat()
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
