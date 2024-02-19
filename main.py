@@ -65,7 +65,7 @@ async def get_users_info(message: Message):
         await message.answer(str(e))
 
 
-@dp.message(F.text.in_({'/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk', '/fav'}))  # Обработчик содержания
+@dp.message(F.text.in_({'/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk', '/fvrt'}))  # Обработчик содержания
 async def get_contents(message: Message):  # Функция для получения разных списков песен
     try:
         c = message.text
@@ -97,7 +97,7 @@ async def get_contents(message: Message):  # Функция для получе�
         elif c == '/kk':
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Краеугольный Камень%' ORDER BY num")
-        elif c == '/fav':
+        elif c == '/fvrt':
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
                            f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
         res = cursor.fetchall()
@@ -110,9 +110,14 @@ async def get_contents(message: Message):  # Функция для получе�
         for i in range(50, len(res)):
             content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                            f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-        for elem in content:
-            if elem:
-                await message.answer(elem)
+        if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and len(res) < 25):
+            num_buttons = {str(num[0]): str(num[0]) for num in res}
+            kb = create_inline_kb(7, **num_buttons)  # Вызываем функцию строителя кнопок
+            await message.answer(text=content[0], reply_markup=kb)
+        else:
+            for elem in content:
+                if elem:
+                    await message.answer(elem)
         metrics('cnt_by_content', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
@@ -160,8 +165,8 @@ async def return_song(num, tg_user_id):
         conn.close()
         sep = '____________________________'
         if result:
-            fav_sign = '❤️' if result[8] else '🤍'
-            favorites_btn = InlineKeyboardButton(text=fav_sign, callback_data='favorites')
+            fvrt_sign = '❤️' if result[8] else '🤍'
+            favorites_btn = InlineKeyboardButton(text=fvrt_sign, callback_data='favorites')
             chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
             kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn]])
             return [True, (f'<i>{result[0]}</i>' + (f'  <b>{result[1]}</b>\n\n' if result[1] else '\n\n') +
@@ -177,28 +182,28 @@ async def return_song(num, tg_user_id):
 @dp.callback_query(F.data == 'favorites')  # Обработчик нажатия кнопки '🤍'
 async def on_click_favorites(callback: CallbackQuery):
     try:
-        song_in_fav = callback.message.reply_markup.inline_keyboard[0][0].text == '❤️'
+        song_in_fvrt = callback.message.reply_markup.inline_keyboard[0][0].text == '❤️'
         tg_user_id = callback.from_user.id
         num = callback.message.text.split()[0]
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM user_song_link WHERE tg_user_id={tg_user_id}")
-        user_in_fav = cursor.fetchone()
-        if song_in_fav:
+        user_in_fvrt = cursor.fetchone()
+        if song_in_fvrt:
             cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id} AND song_num = {num}")
         else:
             cursor.execute(f"INSERT INTO user_song_link VALUES ({tg_user_id}, {num})")
         conn.commit()
         cursor.close()
         conn.close()
-        fav_sign = '🤍' if song_in_fav else '❤️'
-        favorites_btn = InlineKeyboardButton(text=fav_sign, callback_data='favorites')
+        fvrt_sign = '🤍' if song_in_fvrt else '❤️'
+        favorites_btn = InlineKeyboardButton(text=fvrt_sign, callback_data='favorites')
         chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
         kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn]])
-        if song_in_fav:
+        if song_in_fvrt:
             await callback.answer(text='Песня удалена из Избранного!')
         else:
-            if user_in_fav:
+            if user_in_fvrt:
                 await callback.answer(text='Песня добавлена в Избранное!')
             else:
                 await callback.answer(text='Песня добавлена в Избранное!\n'
@@ -246,13 +251,13 @@ async def search_song_by_text(message: Message):
         conn.close()
         song_list = '' if result else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
                                        'Также найти песню можно по названию на английском или по автору!')
-        for song in result[0:10]:
+        for song in result[0:15]:
             song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f'\n        ({song[2]})') +
                           ("" if not song[3] else f'\n        ({song[3]})'))
-        num_buttons = {str(num[0]): str(num[0]) for num in result[0:10]}
+        num_buttons = {str(num[0]): str(num[0]) for num in result[0:15]}
         kb = create_inline_kb(8, **num_buttons)  # Вызываем функцию строителя кнопок
-        await message.answer(song_list + f'\n\n# Показаны только первые 10 из {len(result)} найденных песен. '
-                                f'Сформулируйте запрос точнее. #' if len(result) > 10 else song_list, reply_markup=kb)
+        await message.answer(song_list + f'\n\n# Показаны только первые 15 из {len(result)} найденных песен. '
+                                f'Сформулируйте запрос точнее. #' if len(result) > 15 else song_list, reply_markup=kb)
         metrics('cnt_by_txt', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
