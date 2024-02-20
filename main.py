@@ -159,19 +159,16 @@ async def return_song(num, tg_user_id):
                        f"RETURNING num, alt_name, text, en_name, authors, chords_file_id, audio_file_id, "
                        f"youtube_url) SELECT upd_song.*, EXISTS(SELECT 1 FROM user_song_link "
                        f"WHERE tg_user_id = {tg_user_id} AND song_num = {num}) FROM upd_song")
-        result = cursor.fetchone()
+        res = cursor.fetchone()
         conn.commit()
         cursor.close()
         conn.close()
         sep = '____________________________'
-        if result:
-            fvrt_sign = '❤️' if result[8] else '🤍'
-            favorites_btn = InlineKeyboardButton(text=fvrt_sign, callback_data='favorites')
-            chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
-            kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn]])
-            return [True, (f'<i>{result[0]}</i>' + (f'  <b>{result[1]}</b>\n\n' if result[1] else '\n\n') +
-                           f'{result[2]}\n{sep}' + (f'\n<b>{result[3]}</b>' if result[3] else '') +
-                           (f'\n<i>{result[4]}</i>' if result[4] else '')), kb]
+        if res:
+            kb = under_song_kb(2, res[8], res[6] is not None, res[7] is not None)  # Вызываем функцию клавы под песней
+            return [True, (f'<i>{res[0]}</i>' + (f'  <b>{res[1]}</b>\n\n' if res[1] else '\n\n') +
+                           f'{res[2]}\n{sep}' + (f'\n<b>{res[3]}</b>' if res[3] else '') +
+                           (f'\n<i>{res[4]}</i>' if res[4] else '')), kb]
         else:
             return [False, (f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
                             f'фразу из песни. Также найти песню можно по названию на английском или по автору!')]
@@ -182,7 +179,9 @@ async def return_song(num, tg_user_id):
 @dp.callback_query(F.data == 'favorites')  # Обработчик нажатия кнопки '🤍'
 async def on_click_favorites(callback: CallbackQuery):
     try:
-        song_in_fvrt = callback.message.reply_markup.inline_keyboard[0][0].text == '❤️'
+        kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект клавиатуры
+        song_in_fvrt: bool = kb.inline_keyboard[0][0].text == '❤️'  # Есть ли песня в избранном
+        kb.inline_keyboard[0][0].text = '🤍' if song_in_fvrt else '❤️'  # Меняем цвет сердца на кнопке
         tg_user_id = callback.from_user.id
         num = callback.message.text.split()[0]
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
@@ -196,10 +195,6 @@ async def on_click_favorites(callback: CallbackQuery):
         conn.commit()
         cursor.close()
         conn.close()
-        fvrt_sign = '🤍' if song_in_fvrt else '❤️'
-        favorites_btn = InlineKeyboardButton(text=fvrt_sign, callback_data='favorites')
-        chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
-        kb = InlineKeyboardMarkup(inline_keyboard=[[favorites_btn, chords_btn]])
         if song_in_fvrt:
             await callback.answer(text='Песня удалена из Избранного!')
         else:
@@ -264,6 +259,24 @@ async def search_song_by_text(message: Message):
         logging.exception(e)
 
 
+# Функция строителя клавиатуры после песни
+def under_song_kb(width: int, in_fvrt: bool, is_audio: bool, is_youtube: bool) -> InlineKeyboardMarkup:
+    kb_builder = InlineKeyboardBuilder()
+    fvrt_sign = '❤️' if in_fvrt else '🤍'
+    fvrt_btn = InlineKeyboardButton(text=fvrt_sign, callback_data='favorites')
+    chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
+    audio_btn = InlineKeyboardButton(text='Аудио', callback_data='audio')
+    youtube_btn = InlineKeyboardButton(text='YouTube', callback_data='YouTube')
+    buttons: list[InlineKeyboardButton] = [fvrt_btn, chords_btn]
+    if is_audio:
+        buttons.append(audio_btn)
+    if is_youtube:
+        buttons.append(youtube_btn)
+    kb_builder.row(*buttons, width=width)
+    return kb_builder.as_markup()
+
+
+# Функция строителя клавиатуры с номерами песен после списков
 def create_inline_kb(width: int, *args: str, **kwargs: str) -> InlineKeyboardMarkup:
     kb_builder = InlineKeyboardBuilder()
     buttons: list[InlineKeyboardButton] = []
