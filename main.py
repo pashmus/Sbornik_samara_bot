@@ -13,6 +13,7 @@ import logging
 import psycopg2
 import datetime
 from aiogram.enums import ParseMode
+from math import ceil
 
 is_remote = False  # Переключение БД локальной или удалённой
 config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
@@ -55,17 +56,31 @@ async def get_users_info(message: Message):
             res = cursor.fetchone()
             await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
         else:
-            cursor.execute(f"{message.text}")
-            my_select = cursor.fetchall()
-            output = '\n'.join(str(elem) for elem in my_select)
-            await message.answer(output)
+
+
+            pass
+            # cursor.execute("SELECT id, song_nums FROM themes ORDER BY id")
+            # themes_songs = cursor.fetchall()
+            # for theme in themes_songs:
+            #     theme_id = theme[0]
+            #     song_nums = [int(i) for i in theme[1].split(',')]
+            #     for song_num in sorted(song_nums):
+            #         cursor.execute(f"INSERT INTO theme_song_link (theme_id, song_num) VALUES ({theme_id}, {song_num})")
+            # conn.commit()
+
+
+            # cursor.execute(f"{message.text}")
+            # my_select = cursor.fetchall()
+            # output = '\n'.join(str(elem) for elem in my_select)
+            # await message.answer(output)
         cursor.close()
         conn.close()
     except Exception as e:
+        print(e)
         await message.answer(str(e))
 
 
-@dp.message(F.text.in_({'/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk', '/fvrt'}))  # Обработчик содержания
+@dp.message(F.text.in_({'/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk', '/fvrt'}))
 async def get_contents(message: Message):  # Функция для получения разных списков песен
     try:
         c = message.text
@@ -101,18 +116,21 @@ async def get_contents(message: Message):  # Функция для получе�
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
                            f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
         res = cursor.fetchall()
+        num_of_songs = len(res)
         cursor.close()
         conn.close()
         content = ['', '']
-        for i in range(50 if len(res) > 50 else len(res)):
+        for i in range(50 if num_of_songs > 50 else num_of_songs):
             content[0] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                            f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-        for i in range(50, len(res)):
+        for i in range(50, num_of_songs):
             content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                            f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-        if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and len(res) < 25):
-            num_buttons = {str(num[0]): str(num[0]) for num in res}
-            kb = create_inline_kb(7, **num_buttons)  # Вызываем функцию строителя кнопок
+        if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and num_of_songs < 25):
+            btn_nums = {str(num[0]): str(num[0]) for num in res}
+            width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
+                     else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
+            kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
             await message.answer(text=content[0], reply_markup=kb)
         else:
             for elem in content:
@@ -124,11 +142,89 @@ async def get_contents(message: Message):  # Функция для получе�
         logging.exception(e)
 
 
+# @dp.message(F.text == '/thm')
+# async def get_themes(message: Message):
+#     try:
+#         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT * FROM main_themes")
+#         main_themes = cursor.fetchall()
+#
+#         btn_nums = {f"&;{m_theme_id};{m_theme}": f"🔸 {m_theme} 🔸" for m_theme_id, m_theme in main_themes}
+#         kb = create_inline_kb(1, **btn_nums)  # Вызываем функцию строителя кнопок
+#         await message.answer(text=f"📁 <b>Выберете категорию тем.</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
+#         cursor.close()
+#         conn.close()
+#     except Exception as e:
+#         print(e)
+#         logging.exception(e)
+#
+
+@dp.message(F.text == '/thm')
+async def get_themes(message: Message):
+    try:
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM main_themes")
+        main_themes = cursor.fetchall()
+        cursor.execute("SELECT id, theme, main_theme_id FROM themes ORDER BY id ASC")
+        themes = cursor.fetchall()
+        for m_theme_id, m_theme in main_themes:
+            btn_nums = {f'&;{theme[0]};{theme[1]}': theme[1] for theme in themes if theme[2] == m_theme_id}
+            kb = create_inline_kb(1, **btn_nums)  # Вызываем функцию строителя кнопок
+            gap: int = int(round((45 - len(m_theme)*2.5)))
+            await message.answer(text=f"<b>🔸 {m_theme.upper()}{gap * ' '}.</b>",
+                                 parse_mode=ParseMode.HTML, reply_markup=kb)
+            # dashes: int = int(round((20 - len(m_theme)) / 1.9))
+            # await message.answer(text=f"<b>{dashes * '- '}{m_theme.upper()}{dashes * ' -'}</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(e)
+        logging.exception(e)
+
+
+@dp.callback_query(F.data.startswith('&;'))
+async def on_click_theme(callback: CallbackQuery):
+    try:
+        theme_id = int(callback.data.split(';')[1])
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM songs s JOIN theme_song_link tsl "
+                       f"ON s.num = tsl.song_num WHERE tsl.theme_id = {theme_id}")
+        res = cursor.fetchall()
+        num_of_songs = len(res)
+        content = ''
+        btn_nums = {}
+        if num_of_songs < 25:
+            for song in res:
+                content += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else
+                            f"\n        ({song[2]})") + ("" if not song[3] else f"\n        ({song[3]})"))
+                btn_nums[str(song[0])] = str(song[0])
+            width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
+                     else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
+            kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
+        else:
+            for elem in res:
+                content += (f"\n{str(elem[0])} - {elem[1]}" + ("" if not elem[2] else
+                            f'\n        ({elem[2]})') + ("" if not elem[3] else f'\n        ({elem[3]})'))
+            kb = None
+        await bot.send_message(chat_id=callback.message.chat.id, text=f"🔹 <b>{callback.data.split(';')[2]}:</b>",
+                               parse_mode=ParseMode.HTML)
+        await bot.send_message(chat_id=callback.message.chat.id, text=content, reply_markup=kb)
+        await callback.answer()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(e)
+        logging.exception(e)
+
+
 @dp.message(F.text.isdigit())  # Обработчик номеров песен
 async def search_song_by_num(message: Message):
     try:
         num = message.text
-        result = await return_song(num, message.from_user.id)
+        result = await return_song(num, message.from_user.id)  # Вызываем функцию поиска песни
         if result[0]:
             await message.answer(result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         else:
@@ -241,18 +337,21 @@ async def search_song_by_text(message: Message):
                        f"COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || "
                        f"COALESCE(authors, ''), 'ё', 'е') @@ PHRASETO_TSQUERY(REPLACE('{message.text}', 'ё', 'е')) "
                        f"ORDER BY num")
-        result = cursor.fetchall()
+        res = cursor.fetchall()
+        num_of_songs = len(res) if len(res) < 25 else 24
         cursor.close()
         conn.close()
-        song_list = '' if result else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
-                                       'Также найти песню можно по названию на английском или по автору!')
-        for song in result[0:15]:
-            song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f'\n        ({song[2]})') +
-                          ("" if not song[3] else f'\n        ({song[3]})'))
-        num_buttons = {str(num[0]): str(num[0]) for num in result[0:15]}
-        kb = create_inline_kb(8, **num_buttons)  # Вызываем функцию строителя кнопок
-        await message.answer(song_list + f'\n\n# Показаны только первые 15 из {len(result)} найденных песен. '
-                                f'Сформулируйте запрос точнее. #' if len(result) > 15 else song_list, reply_markup=kb)
+        song_list = '' if res else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
+                                    'Также найти песню можно по названию на английском или по автору!')
+        for song in res[0:24]:
+            song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f"\n        ({song[2]})") +
+                          ("" if not song[3] else f"\n        ({song[3]})"))
+        num_buttons = {str(num[0]): str(num[0]) for num in res[0:24]}
+        width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
+                 else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
+        kb = create_inline_kb(width, **num_buttons)  # Вызываем функцию строителя кнопок
+        await message.answer(song_list + f'\n\n❗️ Показаны только первые 24 из {len(res)} найденных песен. '
+                                f'Сформулируйте запрос точнее. 🤷‍♂️' if len(res) > 24 else song_list, reply_markup=kb)
         metrics('cnt_by_txt', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
