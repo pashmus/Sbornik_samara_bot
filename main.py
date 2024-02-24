@@ -56,27 +56,13 @@ async def get_users_info(message: Message):
             res = cursor.fetchone()
             await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
         else:
-
-
-            pass
-            # cursor.execute("SELECT id, song_nums FROM themes ORDER BY id")
-            # themes_songs = cursor.fetchall()
-            # for theme in themes_songs:
-            #     theme_id = theme[0]
-            #     song_nums = [int(i) for i in theme[1].split(',')]
-            #     for song_num in sorted(song_nums):
-            #         cursor.execute(f"INSERT INTO theme_song_link (theme_id, song_num) VALUES ({theme_id}, {song_num})")
-            # conn.commit()
-
-
-            # cursor.execute(f"{message.text}")
-            # my_select = cursor.fetchall()
-            # output = '\n'.join(str(elem) for elem in my_select)
-            # await message.answer(output)
+            cursor.execute(f"{message.text}")
+            my_select = cursor.fetchall()
+            output = '\n'.join(str(elem) for elem in my_select)
+            await message.answer(output)
         cursor.close()
         conn.close()
     except Exception as e:
-        print(e)
         await message.answer(str(e))
 
 
@@ -127,7 +113,7 @@ async def get_contents(message: Message):  # Функция для получе�
             content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                            f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
         if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and num_of_songs < 25):
-            btn_nums = {str(num[0]): str(num[0]) for num in res}
+            btn_nums = {f"song_lst;{num[0]}": str(num[0]) for num in res}
             width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
                      else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
             kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
@@ -136,91 +122,92 @@ async def get_contents(message: Message):  # Функция для получе�
             for elem in content:
                 if elem:
                     await message.answer(elem)
-        metrics('cnt_by_content', message.from_user)
+        metrics('cnt_by_content' if c.startswith('/c') else 'cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers',
+                message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
         logging.exception(e)
 
 
-# @dp.message(F.text == '/thm')
-# async def get_themes(message: Message):
-#     try:
-#         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
-#         cursor = conn.cursor()
-#         cursor.execute("SELECT * FROM main_themes")
-#         main_themes = cursor.fetchall()
-#
-#         btn_nums = {f"&;{m_theme_id};{m_theme}": f"🔸 {m_theme} 🔸" for m_theme_id, m_theme in main_themes}
-#         kb = create_inline_kb(1, **btn_nums)  # Вызываем функцию строителя кнопок
-#         await message.answer(text=f"📁 <b>Выберете категорию тем.</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
-#         cursor.close()
-#         conn.close()
-#     except Exception as e:
-#         print(e)
-#         logging.exception(e)
-#
-
-@dp.message(F.text == '/thm')
-async def get_themes(message: Message):
+@dp.message(F.text == '/thm')  # Обработчик тематического указателя
+async def get_main_themes(message: Message):
     try:
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM main_themes")
-        main_themes = cursor.fetchall()
-        cursor.execute("SELECT id, theme, main_theme_id FROM themes ORDER BY id ASC")
-        themes = cursor.fetchall()
-        for m_theme_id, m_theme in main_themes:
-            btn_nums = {f'&;{theme[0]};{theme[1]}': theme[1] for theme in themes if theme[2] == m_theme_id}
-            kb = create_inline_kb(1, **btn_nums)  # Вызываем функцию строителя кнопок
-            gap: int = int(round((45 - len(m_theme)*2.5)))
-            await message.answer(text=f"<b>🔸 {m_theme.upper()}{gap * ' '}.</b>",
-                                 parse_mode=ParseMode.HTML, reply_markup=kb)
-            # dashes: int = int(round((20 - len(m_theme)) / 1.9))
-            # await message.answer(text=f"<b>{dashes * '- '}{m_theme.upper()}{dashes * ' -'}</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
-        cursor.close()
-        conn.close()
+        kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
+        await message.answer(text=f"🗂 <b>Выберете категорию тем.</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
-        print(e)
         logging.exception(e)
 
 
-@dp.callback_query(F.data.startswith('&;'))
-async def on_click_theme(callback: CallbackQuery):
+@dp.callback_query(F.data.startswith('&;'))  # Обработчик нажатия на Категорию. data = f"&;{m_theme_id};{m_theme}"
+async def on_click_main_theme(callback: CallbackQuery):
     try:
-        theme_id = int(callback.data.split(';')[1])
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM songs s JOIN theme_song_link tsl "
-                       f"ON s.num = tsl.song_num WHERE tsl.theme_id = {theme_id}")
-        res = cursor.fetchall()
-        num_of_songs = len(res)
-        content = ''
-        btn_nums = {}
-        if num_of_songs < 25:
-            for song in res:
-                content += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else
-                            f"\n        ({song[2]})") + ("" if not song[3] else f"\n        ({song[3]})"))
-                btn_nums[str(song[0])] = str(song[0])
-            width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
-                     else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
-            kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
+        kb = create_inline_kb(width=1, back_btn='to_main_themes', **get_themes_btns(callback.data))  # Вызываем функцию строителя кнопок
+        await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
+                                         parse_mode=ParseMode.HTML, reply_markup=kb)
+    except Exception as e:
+        logging.exception(e)
+
+
+@dp.callback_query(F.data.startswith('to_main_themes') | F.data.startswith('%;'))  # Обработчик нажатия на тему или Назад
+async def on_click_theme_or_back(callback: CallbackQuery):
+    try:
+        if callback.data == 'to_main_themes':
+            kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
+            await callback.message.edit_text(text=f"🗂 <b>Выберете категорию тем.</b>", parse_mode=ParseMode.HTML,
+                                             reply_markup=kb)
         else:
-            for elem in res:
-                content += (f"\n{str(elem[0])} - {elem[1]}" + ("" if not elem[2] else
-                            f'\n        ({elem[2]})') + ("" if not elem[3] else f'\n        ({elem[3]})'))
-            kb = None
-        await bot.send_message(chat_id=callback.message.chat.id, text=f"🔹 <b>{callback.data.split(';')[2]}:</b>",
-                               parse_mode=ParseMode.HTML)
-        await bot.send_message(chat_id=callback.message.chat.id, text=content, reply_markup=kb)
-        await callback.answer()
-        cursor.close()
-        conn.close()
+            m_theme = callback.message.text.split('"')[1]
+            m_theme_id, theme_id = callback.data.split(';')[1], callback.data.split(';')[2]
+            conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM songs s JOIN theme_song_link tsl "
+                           f"ON s.num = tsl.song_num WHERE tsl.theme_id = {int(theme_id)}")
+            res = cursor.fetchall()
+            num_of_songs = len(res)
+            content = f"🔹 <b>{callback.data.split(';')[3]}:</b>\n"
+            btn_nums = {}
+            if num_of_songs < 25:
+                for song in res:
+                    content += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else
+                                f"\n        ({song[2]})") + ("" if not song[3] else f"\n        ({song[3]})"))
+                    btn_nums[f"song_lst;{song[0]}"] = str(song[0])
+                width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
+                         else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
+                kb = create_inline_kb(width=width, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}", **btn_nums)  # Вызываем функцию строителя кнопок
+            else:
+                for elem in res:
+                    content += (f"\n{str(elem[0])} - {elem[1]}" + ("" if not elem[2] else
+                                f'\n        ({elem[2]})') + ("" if not elem[3] else f'\n        ({elem[3]})'))
+                kb = create_inline_kb(width=1, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}")  # Вызываем функцию строителя кнопок
+            await callback.message.edit_text(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
+            cursor.close()
+            conn.close()
+        metrics('cnt_by_themes', callback.from_user)
+        metrics('users', callback.from_user)
     except Exception as e:
-        print(e)
         logging.exception(e)
 
 
-@dp.message(F.text.isdigit())  # Обработчик номеров песен
+@dp.callback_query(F.data.startswith('song_lst'))  # Обработчик нажатия на кнопку с номером песни
+async def on_click_song_or_back(callback: CallbackQuery):
+    try:
+        num = callback.data.split(';')[1]
+        if num == 'to_themes':
+            kb = create_inline_kb(1, back_btn='to_main_themes', **get_themes_btns(f"&;{callback.data.split(';')[2]}"))  # Вызываем функцию строителя кнопок
+            await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[3]}":</b>',
+                                             parse_mode=ParseMode.HTML, reply_markup=kb)
+        else:
+            result = await return_song(num, callback.from_user.id)
+            await bot.send_message(chat_id=callback.message.chat.id, text=result[1], parse_mode=ParseMode.HTML,
+                                   reply_markup=result[2])
+            await callback.answer()
+        metrics('cnt_by_nums', callback.from_user)
+        metrics('users', callback.from_user)
+    except Exception as e:
+        logging.exception(e)
+
+
+@dp.message(F.text.isdigit())  # Обработчик ввода номера песни
 async def search_song_by_num(message: Message):
     try:
         num = message.text
@@ -231,18 +218,6 @@ async def search_song_by_num(message: Message):
             await message.answer(result[1])
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
-    except Exception as e:
-        logging.exception(e)
-
-
-@dp.callback_query(F.data.isdigit())  # Обработчик нажатия на кнопку с номером песни
-async def on_click_song(callback: CallbackQuery):
-    try:
-        num = callback.data
-        result = await return_song(num, callback.from_user.id)
-        await bot.send_message(chat_id=callback.message.chat.id, text=result[1], parse_mode=ParseMode.HTML,
-                               reply_markup=result[2])
-        await callback.answer()
     except Exception as e:
         logging.exception(e)
 
@@ -346,10 +321,10 @@ async def search_song_by_text(message: Message):
         for song in res[0:24]:
             song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f"\n        ({song[2]})") +
                           ("" if not song[3] else f"\n        ({song[3]})"))
-        num_buttons = {str(num[0]): str(num[0]) for num in res[0:24]}
+        btn_nums = {f"song_lst;{num[0]}": str(num[0]) for num in res[0:24]}
         width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
                  else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
-        kb = create_inline_kb(width, **num_buttons)  # Вызываем функцию строителя кнопок
+        kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
         await message.answer(song_list + f'\n\n❗️ Показаны только первые 24 из {len(res)} найденных песен. '
                                 f'Сформулируйте запрос точнее. 🤷‍♂️' if len(res) > 24 else song_list, reply_markup=kb)
         metrics('cnt_by_txt', message.from_user)
@@ -376,14 +351,33 @@ def under_song_kb(width: int, in_fvrt: bool, is_audio: bool, is_youtube: bool) -
 
 
 # Функция строителя клавиатуры с номерами песен после списков
-def create_inline_kb(width: int, *args: str, **kwargs: str) -> InlineKeyboardMarkup:
+def create_inline_kb(width, *args, back_btn = None, **kwargs) -> InlineKeyboardMarkup:
     kb_builder = InlineKeyboardBuilder()
     buttons: list[InlineKeyboardButton] = []
     if kwargs:
         for btn, txt in kwargs.items():
             buttons.append(InlineKeyboardButton(text=txt, callback_data=btn))
     kb_builder.row(*buttons, width=width)
+    if back_btn:
+        kb_builder.row(InlineKeyboardButton(text='⬅️ Назад', callback_data=back_btn))
     return kb_builder.as_markup()
+
+
+def get_themes_btns(theme):  # Формируем кнопки с темами
+    conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+    cursor = conn.cursor()
+    if theme == 'main_themes':
+        cursor.execute("SELECT * FROM main_themes")
+        main_themes = cursor.fetchall()
+        themes_btns = {f"&;{m_theme_id};{m_theme}": f"🔸 {m_theme} 🔸" for m_theme_id, m_theme in main_themes}
+    else:
+        m_theme_id = int(theme.split(';')[1])
+        cursor.execute(f"SELECT id, theme FROM themes WHERE main_theme_id = {m_theme_id} ORDER BY id ASC")
+        themes = cursor.fetchall()
+        themes_btns = {f"%;{m_theme_id};{id};{theme}": f"🔹 {theme} 🔹" for id, theme in themes}
+    cursor.close()
+    conn.close()
+    return themes_btns
 
 
 def metrics(act, user_info):  # Аналитика
@@ -415,9 +409,15 @@ def metrics(act, user_info):  # Аналитика
             elif act == 'cnt_by_txt':  # Счётчик поиска по фразе
                 cursor.execute(f"UPDATE metrics SET cnt_by_txt = cnt_by_txt + 1 WHERE id_period = '{id_period[0]}'")
             elif act == 'cnt_by_chords':  # Счётчик нажатия "Аккорды"
-                cursor.execute(f"UPDATE metrics SET cnt_by_chords = cnt_by_chords + 1 WHERE id_period = '{id_period[0]}'")
+                cursor.execute(f"UPDATE metrics SET cnt_by_chords = cnt_by_chords+1 WHERE id_period = '{id_period[0]}'")
                 cursor.execute(f"UPDATE users SET u_cnt_chords = u_cnt_chords + 1, "
                             f"last_access = current_timestamp(0) + INTERVAL '1 hours' WHERE telgrm_user_id = {user_id}")
+            elif act == 'cnt_by_singers':  # Счётчик поиска по исполнителям
+                cursor.execute(f"UPDATE metrics SET cnt_by_singers=cnt_by_singers+1 WHERE id_period='{id_period[0]}'")
+            elif act == 'cnt_by_themes':  # Счётчик поиска по темам
+                cursor.execute(f"UPDATE metrics SET cnt_by_themes = cnt_by_themes+1 WHERE id_period = '{id_period[0]}'")
+            elif act == 'cnt_by_fvrt':  # Счётчик поиска по темам
+                cursor.execute(f"UPDATE metrics SET cnt_by_fvrt = cnt_by_fvrt + 1 WHERE id_period = '{id_period[0]}'")
         conn.commit()
         cursor.close()
         conn.close()
