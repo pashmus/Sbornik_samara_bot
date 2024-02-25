@@ -113,7 +113,7 @@ async def get_contents(message: Message):  # Функция для получе�
             content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                            f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
         if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and num_of_songs < 25):
-            btn_nums = {f"song_lst;{num[0]}": str(num[0]) for num in res}
+            btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
             width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
                      else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
             kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
@@ -142,17 +142,17 @@ async def get_main_themes(message: Message):
 async def on_click_main_theme(callback: CallbackQuery):
     try:
         # Вызываем функцию строителя кнопок с темами
-        kb = create_inline_kb(width=1, back_btn='to_main_themes', **get_themes_btns(callback.data))
+        kb = create_inline_kb(width=1, back_btn='to_main_themes_btn', **get_themes_btns(callback.data))
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
         logging.exception(e)
 
 
-@dp.callback_query(F.data.startswith('to_main_themes') | F.data.startswith('%;')) # Обработчик нажатия на тему или Назад
+@dp.callback_query(F.data.startswith('to_main_themes_btn') | F.data.startswith('%;')) # Обработчик нажатия на тему или Назад
 async def on_click_theme_or_back(callback: CallbackQuery):
     try:
-        if callback.data == 'to_main_themes':
+        if callback.data == 'to_main_themes_btn':
             kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
             await callback.message.edit_text(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML,
                                              reply_markup=kb)
@@ -171,17 +171,17 @@ async def on_click_theme_or_back(callback: CallbackQuery):
                 for song in res:
                     content += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else
                                 f"\n        ({song[2]})") + ("" if not song[3] else f"\n        ({song[3]})"))
-                    btn_nums[f"song_lst;{song[0]}"] = str(song[0])
+                    btn_nums[f"song_btn;{song[0]}"] = str(song[0])
                 width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
                          else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
                 # Вызываем функцию строителя кнопок с номерами песен
-                kb = create_inline_kb(width=width, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}", **btn_nums)
+                kb = create_inline_kb(width=width, back_btn=f"song_btn;to_themes;{m_theme_id};{m_theme}", **btn_nums)
             else:
                 for elem in res:
                     content += (f"\n{str(elem[0])} - {elem[1]}" + ("" if not elem[2] else
                                 f'\n        ({elem[2]})') + ("" if not elem[3] else f'\n        ({elem[3]})'))
                 # Вызываем функцию строителя кнопок с номерами песен
-                kb = create_inline_kb(width=1, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}")
+                kb = create_inline_kb(width=1, back_btn=f"song_btn;to_themes;{m_theme_id};{m_theme}")
             await callback.message.edit_text(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
             cursor.close()
             conn.close()
@@ -191,13 +191,13 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         logging.exception(e)
 
 
-@dp.callback_query(F.data.startswith('song_lst'))  # Обработчик нажатия на кнопку с номером песни
+@dp.callback_query(F.data.startswith('song_btn'))  # Обработчик нажатия на кнопку с номером песни
 async def on_click_song_or_back(callback: CallbackQuery):
     try:
         num = callback.data.split(';')[1]
         if num == 'to_themes':
             # Вызываем функцию строителя кнопок с темами
-            kb = create_inline_kb(1, back_btn='to_main_themes', **get_themes_btns(f"&;{callback.data.split(';')[2]}"))
+            kb = create_inline_kb(1, back_btn='to_main_themes_btn', **get_themes_btns(f"&;{callback.data.split(';')[2]}"))
             await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[3]}":</b>',
                                              parse_mode=ParseMode.HTML, reply_markup=kb)
         else:
@@ -223,6 +223,7 @@ async def search_song_by_num(message: Message):
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
+        print(e)
         logging.exception(e)
 
 
@@ -252,7 +253,7 @@ async def return_song(num, tg_user_id):
         logging.exception(e)
 
 
-@dp.callback_query(F.data == 'favorites')  # Обработчик нажатия кнопки '🤍'
+@dp.callback_query(F.data == 'fvrt_btn')  # Обработчик нажатия кнопки '🤍'
 async def on_click_favorites(callback: CallbackQuery):
     try:
         kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект клавиатуры
@@ -281,14 +282,15 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
+        print(e)
         logging.exception(e)
 
 
-@dp.callback_query(F.data == 'Chords')  # Обработчик нажатия кнопки "Аккорды"
+@dp.callback_query(F.data == 'Chords_btn')  # Обработчик нажатия кнопки "Аккорды"
 async def on_click_chords(callback: CallbackQuery):
     try:
         kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект клавиатуры
-        kb.inline_keyboard[0][1].text, kb.inline_keyboard[0][1].callback_data = 'Текст', 'Text'
+        kb.inline_keyboard[0][1].text, kb.inline_keyboard[0][1].callback_data = 'Текст', 'txt_btn'
         first_str = callback.message.text.split('\n')[0]
         num = first_str.split()[0]
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
@@ -315,7 +317,7 @@ async def on_click_chords(callback: CallbackQuery):
 
 
 
-@dp.callback_query(F.data == 'Text')  # Обработчик нажатия кнопки "Текст"
+@dp.callback_query(F.data == 'txt_btn')  # Обработчик нажатия кнопки "Текст"
 async def on_click_text(callback: CallbackQuery):
     try:
         num = callback.message.caption.split()[0]
@@ -346,7 +348,7 @@ async def search_song_by_text(message: Message):
         for song in res[0:24]:
             song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f"\n        ({song[2]})") +
                           ("" if not song[3] else f"\n        ({song[3]})"))
-        btn_nums = {f"song_lst;{num[0]}": str(num[0]) for num in res[0:24]}
+        btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res[0:24]}
         width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
                  else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
         kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
@@ -362,10 +364,10 @@ async def search_song_by_text(message: Message):
 def under_song_kb(width: int, in_fvrt: bool, is_audio: bool, is_youtube: bool) -> InlineKeyboardMarkup:
     kb_builder = InlineKeyboardBuilder()
     fvrt_sign = '❤️' if in_fvrt else '🤍'
-    fvrt_btn = InlineKeyboardButton(text=fvrt_sign, callback_data='favorites')
-    chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords')
-    audio_btn = InlineKeyboardButton(text='Аудио', callback_data='audio')
-    youtube_btn = InlineKeyboardButton(text='YouTube', callback_data='YouTube')
+    fvrt_btn = InlineKeyboardButton(text=fvrt_sign, callback_data='fvrt_btn')
+    chords_btn = InlineKeyboardButton(text='Аккорды', callback_data='Chords_btn')
+    audio_btn = InlineKeyboardButton(text='Аудио', callback_data='audio_btn')
+    youtube_btn = InlineKeyboardButton(text='YouTube', callback_data='YouTube_btn')
     buttons: list[InlineKeyboardButton] = [fvrt_btn, chords_btn]
     if is_audio:
         buttons.append(audio_btn)
