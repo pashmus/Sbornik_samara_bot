@@ -141,14 +141,15 @@ async def get_main_themes(message: Message):
 @dp.callback_query(F.data.startswith('&;'))  # Обработчик нажатия на Категорию. data = f"&;{m_theme_id};{m_theme}"
 async def on_click_main_theme(callback: CallbackQuery):
     try:
-        kb = create_inline_kb(width=1, back_btn='to_main_themes', **get_themes_btns(callback.data))  # Вызываем функцию строителя кнопок
+        # Вызываем функцию строителя кнопок с темами
+        kb = create_inline_kb(width=1, back_btn='to_main_themes', **get_themes_btns(callback.data))
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
         logging.exception(e)
 
 
-@dp.callback_query(F.data.startswith('to_main_themes') | F.data.startswith('%;'))  # Обработчик нажатия на тему или Назад
+@dp.callback_query(F.data.startswith('to_main_themes') | F.data.startswith('%;')) # Обработчик нажатия на тему или Назад
 async def on_click_theme_or_back(callback: CallbackQuery):
     try:
         if callback.data == 'to_main_themes':
@@ -173,12 +174,14 @@ async def on_click_theme_or_back(callback: CallbackQuery):
                     btn_nums[f"song_lst;{song[0]}"] = str(song[0])
                 width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
                          else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
-                kb = create_inline_kb(width=width, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}", **btn_nums)  # Вызываем функцию строителя кнопок
+                # Вызываем функцию строителя кнопок с номерами песен
+                kb = create_inline_kb(width=width, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}", **btn_nums)
             else:
                 for elem in res:
                     content += (f"\n{str(elem[0])} - {elem[1]}" + ("" if not elem[2] else
                                 f'\n        ({elem[2]})') + ("" if not elem[3] else f'\n        ({elem[3]})'))
-                kb = create_inline_kb(width=1, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}")  # Вызываем функцию строителя кнопок
+                # Вызываем функцию строителя кнопок с номерами песен
+                kb = create_inline_kb(width=1, back_btn=f"song_lst;to_themes;{m_theme_id};{m_theme}")
             await callback.message.edit_text(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
             cursor.close()
             conn.close()
@@ -193,11 +196,12 @@ async def on_click_song_or_back(callback: CallbackQuery):
     try:
         num = callback.data.split(';')[1]
         if num == 'to_themes':
-            kb = create_inline_kb(1, back_btn='to_main_themes', **get_themes_btns(f"&;{callback.data.split(';')[2]}"))  # Вызываем функцию строителя кнопок
+            # Вызываем функцию строителя кнопок с темами
+            kb = create_inline_kb(1, back_btn='to_main_themes', **get_themes_btns(f"&;{callback.data.split(';')[2]}"))
             await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[3]}":</b>',
                                              parse_mode=ParseMode.HTML, reply_markup=kb)
         else:
-            result = await return_song(num, callback.from_user.id)
+            result = await return_song(num, callback.from_user.id)  # Вызываем функцию поиска песни
             await bot.send_message(chat_id=callback.message.chat.id, text=result[1], parse_mode=ParseMode.HTML,
                                    reply_markup=result[2])
             await callback.answer()
@@ -236,7 +240,8 @@ async def return_song(num, tg_user_id):
         conn.close()
         sep = '____________________________'
         if res:
-            kb = under_song_kb(2, res[8], res[6] is not None, res[7] is not None)  # Вызываем функцию клавы под песней
+            # Вызываем функцию строителя клавиатуры под песней
+            kb = under_song_kb(width=2, in_fvrt=res[8], is_audio=res[6] is not None, is_youtube=res[7] is not None)
             return [True, (f'<i>{res[0]}</i>' + (f'  <b>{res[1]}</b>\n\n' if res[1] else '\n\n') +
                            f'{res[2]}\n{sep}' + (f'\n<b>{res[3]}</b>' if res[3] else '') +
                            (f'\n<i>{res[4]}</i>' if res[4] else '')), kb]
@@ -254,7 +259,7 @@ async def on_click_favorites(callback: CallbackQuery):
         song_in_fvrt: bool = kb.inline_keyboard[0][0].text == '❤️'  # Есть ли песня в избранном
         kb.inline_keyboard[0][0].text = '🤍' if song_in_fvrt else '❤️'  # Меняем цвет сердца на кнопке
         tg_user_id = callback.from_user.id
-        num = callback.message.text.split()[0]
+        num = callback.message.text.split()[0] if callback.message.text else callback.message.caption.split()[0]
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM user_song_link WHERE tg_user_id={tg_user_id}")
@@ -282,16 +287,21 @@ async def on_click_favorites(callback: CallbackQuery):
 @dp.callback_query(F.data == 'Chords')  # Обработчик нажатия кнопки "Аккорды"
 async def on_click_chords(callback: CallbackQuery):
     try:
-        num = callback.message.text.split()[0]
+        kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект клавиатуры
+        kb.inline_keyboard[0][1].text, kb.inline_keyboard[0][1].callback_data = 'Текст', 'Text'
+        first_str = callback.message.text.split('\n')[0]
+        num = first_str.split()[0]
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"SELECT chords_file_id FROM songs where num = {num}")
         chords_file_id = cursor.fetchone()[0]
         if chords_file_id:
-            await bot.send_photo(chat_id=callback.message.chat.id, photo=chords_file_id, caption=num)
+            await callback.message.answer_photo(photo=chords_file_id, caption=first_str, reply_markup=kb)
+            await callback.message.delete()
         else:
             file = FSInputFile(f'Chords_jpg/{num}.jpg')
-            photo_info = await bot.send_photo(chat_id=callback.message.chat.id, photo=file, caption=num)
+            photo_info = await callback.message.answer_photo(photo=file, caption=first_str, reply_markup=kb)
+            await callback.message.delete()
             file_id = photo_info.photo[-1].file_id
             cursor.execute(f"UPDATE songs SET chords_file_id = '{file_id}' WHERE num = {num}")
             conn.commit()
@@ -300,6 +310,21 @@ async def on_click_chords(callback: CallbackQuery):
         metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
     except Exception as e:
+        print(e)
+        logging.exception(e)
+
+
+
+@dp.callback_query(F.data == 'Text')  # Обработчик нажатия кнопки "Текст"
+async def on_click_text(callback: CallbackQuery):
+    try:
+        num = callback.message.caption.split()[0]
+        result = await return_song(num, callback.from_user.id)
+        await bot.send_message(chat_id=callback.message.chat.id, text=result[1], parse_mode=ParseMode.HTML,
+                               reply_markup=result[2])
+        await callback.message.delete()
+    except Exception as e:
+        print(e)
         logging.exception(e)
 
 
