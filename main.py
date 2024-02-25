@@ -223,7 +223,6 @@ async def search_song_by_num(message: Message):
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        print(e)
         logging.exception(e)
 
 
@@ -282,7 +281,6 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
-        print(e)
         logging.exception(e)
 
 
@@ -312,9 +310,7 @@ async def on_click_chords(callback: CallbackQuery):
         metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
     except Exception as e:
-        print(e)
         logging.exception(e)
-
 
 
 @dp.callback_query(F.data == 'txt_btn')  # Обработчик нажатия кнопки "Текст"
@@ -326,7 +322,23 @@ async def on_click_text(callback: CallbackQuery):
                                reply_markup=result[2])
         await callback.message.delete()
     except Exception as e:
-        print(e)
+        logging.exception(e)
+
+
+@dp.callback_query(F.data == 'YouTube_btn')  # Обработчик нажатия кнопки "YouTube"
+async def on_click_youtube(callback: CallbackQuery):
+    try:
+        num = callback.message.text.split()[0] if callback.message.text else callback.message.caption.split()[0]
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT youtube_url FROM songs WHERE num = {num}")
+        youtube_url = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        for elem in youtube_url.split(','):
+            await callback.message.answer(text=elem)
+        await callback.answer()
+    except Exception as e:
         logging.exception(e)
 
 
@@ -397,7 +409,6 @@ def get_themes_btns(theme):  # Формируем кнопки с темами
     #     cursor.execute("SELECT * FROM main_themes")
     #     main_themes = cursor.fetchall()
     #     themes_btns = {f"&;{m_theme_id};{m_theme}": f"🔸 {m_theme} 🔸" for m_theme_id, m_theme in main_themes}
-    #     print(themes_btns)
     #
     # else:
     #     m_theme_id = int(theme.split(';')[1])
