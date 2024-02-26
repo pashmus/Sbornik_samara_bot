@@ -202,7 +202,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
                                              parse_mode=ParseMode.HTML, reply_markup=kb)
         else:
             result = await return_song(num, callback.from_user.id)  # Вызываем функцию поиска песни
-            await bot.send_message(chat_id=callback.message.chat.id, text=result[1], parse_mode=ParseMode.HTML,
+            await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML,
                                    reply_markup=result[2])
             await callback.answer()
         metrics('cnt_by_nums', callback.from_user)
@@ -318,8 +318,7 @@ async def on_click_text(callback: CallbackQuery):
     try:
         num = callback.message.caption.split()[0]
         result = await return_song(num, callback.from_user.id)
-        await bot.send_message(chat_id=callback.message.chat.id, text=result[1], parse_mode=ParseMode.HTML,
-                               reply_markup=result[2])
+        await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         await callback.message.delete()
     except Exception as e:
         logging.exception(e)
