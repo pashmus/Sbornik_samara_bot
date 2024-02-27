@@ -14,6 +14,8 @@ import psycopg2
 import datetime
 from aiogram.enums import ParseMode
 from math import ceil
+import glob
+import time
 
 is_remote = False  # Переключение БД локальной или удалённой
 config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
@@ -231,7 +233,7 @@ async def return_song(num, tg_user_id):
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         cursor.execute(f"WITH upd_song AS (UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {num} "
-                       f"RETURNING num, alt_name, text, en_name, authors, chords_file_id, audio_file_id, "
+                       f"RETURNING num, name, alt_name, text, en_name, authors, chords_file_id, audio_file_id, "
                        f"youtube_url) SELECT upd_song.*, EXISTS(SELECT 1 FROM user_song_link "
                        f"WHERE tg_user_id = {tg_user_id} AND song_num = {num}) FROM upd_song")
         res = cursor.fetchone()
@@ -241,10 +243,10 @@ async def return_song(num, tg_user_id):
         sep = '____________________________'
         if res:
             # Вызываем функцию строителя клавиатуры под песней
-            kb = under_song_kb(width=2, in_fvrt=res[8], is_audio=res[6] is not None, is_youtube=res[7] is not None)
-            return [True, (f'<i>{res[0]}</i>' + (f'  <b>{res[1]}</b>\n\n' if res[1] else '\n\n') +
-                           f'{res[2]}\n{sep}' + (f'\n<b>{res[3]}</b>' if res[3] else '') +
-                           (f'\n<i>{res[4]}</i>' if res[4] else '')), kb]
+            kb = under_song_kb(width=2, in_fvrt=res[9], is_audio=res[7] is not None, is_youtube=res[8] is not None)
+            return [True, (f'<i>{res[0]}</i>' + (f'  <b>{res[2]}</b>\n\n' if res[2] else f'  <b>{res[1]}</b>\n\n') +
+                           f'{res[3]}\n{sep}' + (f'\n<b>{res[4]}</b>' if res[4] else '') +
+                           (f'\n<i>{res[5]}</i>' if res[5] else '')), kb]
         else:
             return [False, (f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
                             f'фразу из песни. Также найти песню можно по названию на английском или по автору!')]
@@ -324,6 +326,35 @@ async def on_click_text(callback: CallbackQuery):
         logging.exception(e)
 
 
+@dp.callback_query(F.data == 'audio_btn')  # Обработчик нажатия кнопки "Аудио"
+async def on_click_audio(callback: CallbackQuery):
+    try:
+        first_str = callback.message.text.split('\n')[0]
+        num = first_str.split()[0]
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT audio_file_id FROM songs where num = {num}")
+        audio_file_id = cursor.fetchone()[0]
+        if audio_file_id != 'yes':
+            for elem in audio_file_id.split(';'):
+                await callback.message.answer_audio(audio=elem, caption=first_str)
+        else:
+            file_id = []
+            for file in glob.glob(f'Audio/{num}/*.mp3'):
+                file_input = FSInputFile(file)
+                audio_info = await callback.message.answer_audio(audio=file_input, caption=first_str)
+                file_id.append(audio_info.audio.file_id)
+            file_id_join = ';'.join(file_id)
+            cursor.execute(f"UPDATE songs SET audio_file_id = '{file_id_join}' WHERE num = {num}")
+            conn.commit()
+        cursor.close()
+        conn.close()
+        await callback.answer()
+        metrics('cnt_by_audio', callback.from_user)
+    except Exception as e:
+        logging.exception(e)
+
+
 @dp.callback_query(F.data == 'YouTube_btn')  # Обработчик нажатия кнопки "YouTube"
 async def on_click_youtube(callback: CallbackQuery):
     try:
@@ -337,6 +368,7 @@ async def on_click_youtube(callback: CallbackQuery):
         for elem in youtube_url.split(','):
             await callback.message.answer(text=elem)
         await callback.answer()
+        metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
         logging.exception(e)
 
@@ -509,8 +541,12 @@ def metrics(act, user_info):  # Аналитика
                 cursor.execute(f"UPDATE metrics SET cnt_by_singers=cnt_by_singers+1 WHERE id_period='{id_period[0]}'")
             elif act == 'cnt_by_themes':  # Счётчик поиска по темам
                 cursor.execute(f"UPDATE metrics SET cnt_by_themes = cnt_by_themes+1 WHERE id_period = '{id_period[0]}'")
-            elif act == 'cnt_by_fvrt':  # Счётчик поиска по темам
+            elif act == 'cnt_by_fvrt':  # Счётчик поиска избранному
                 cursor.execute(f"UPDATE metrics SET cnt_by_fvrt = cnt_by_fvrt + 1 WHERE id_period = '{id_period[0]}'")
+            elif act == 'cnt_by_audio':  # Счётчик нажатия "Аудио"
+                cursor.execute(f"UPDATE metrics SET cnt_by_audio = cnt_by_audio + 1 WHERE id_period = '{id_period[0]}'")
+            elif act == 'cnt_by_youtube':  # Счётчик нажатия "YouTube"
+                cursor.execute(f"UPDATE metrics SET cnt_by_youtube = cnt_by_youtube + 1 WHERE id_period = '{id_period[0]}'")
         conn.commit()
         cursor.close()
         conn.close()
