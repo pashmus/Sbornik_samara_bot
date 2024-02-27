@@ -15,7 +15,6 @@ import datetime
 from aiogram.enums import ParseMode
 from math import ceil
 import glob
-import time
 
 is_remote = False  # Переключение БД локальной или удалённой
 config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
@@ -29,6 +28,7 @@ dp = Dispatcher()
 logging.basicConfig(filename='errors.log', level=logging.ERROR,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
 amount_songs = 376
+error_msg = ('Ой, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: @pavvv_ssb')
 
 
 @dp.message(CommandStart())  # Обработчик команды /start
@@ -40,6 +40,7 @@ async def welcome(message: Message):
                              parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
+        await message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -54,7 +55,7 @@ async def get_users_info(message: Message):
                            f"WHERE last_access >= current_date) AS b, (SELECT COUNT(u.*) FROM users u JOIN periods p "
                            f"ON p.id = TO_CHAR(current_date, 'YYYY-MM') WHERE u.last_access "
                            f"BETWEEN p.dt_beg AND p.dt_end) AS c, (SELECT SUM(cnt_by_content + cnt_by_nums + "
-                           f"cnt_by_txt + cnt_by_chords + cnt_by_audio_ru + cnt_by_media_en) FROM metrics) AS d")
+                           f"cnt_by_txt + cnt_by_chords + cnt_by_audio + cnt_by_youtube) FROM metrics) AS d")
             res = cursor.fetchone()
             await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
         else:
@@ -104,30 +105,35 @@ async def get_contents(message: Message):  # Функция для получе�
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
                            f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
         res = cursor.fetchall()
-        num_of_songs = len(res)
         cursor.close()
         conn.close()
-        content = ['', '']
-        for i in range(50 if num_of_songs > 50 else num_of_songs):
-            content[0] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
-                           f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-        for i in range(50, num_of_songs):
-            content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
-                           f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-        if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and num_of_songs < 25):
-            btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
-            width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
-                     else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
-            kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
-            await message.answer(text=content[0], reply_markup=kb)
+        num_of_songs = len(res)
+        if num_of_songs == 0 and c == '/fvrt':
+            await message.answer(text='В папке Избранное пусто. 🤷‍♂️ Чтобы добавить песню в Избранное, '
+                                      'нажмите на кнопку с 🤍 под песней.')
         else:
-            for elem in content:
-                if elem:
-                    await message.answer(elem)
-        metrics('cnt_by_content' if c.startswith('/c') else 'cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers',
-                message.from_user)
-        metrics('users', message.from_user)
+            content = ['', '']
+            for i in range(50 if num_of_songs > 50 else num_of_songs):
+                content[0] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                               f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
+            for i in range(50, num_of_songs):
+                content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                               f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
+            if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and num_of_songs < 25):
+                btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
+                width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
+                         else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
+                kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
+                await message.answer(text=content[0], reply_markup=kb)
+            else:
+                for elem in content:
+                    if elem:
+                        await message.answer(elem)
+            metrics('cnt_by_content' if c.startswith('/c') else 'cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers',
+                    message.from_user)
+            metrics('users', message.from_user)
     except Exception as e:
+        await message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -137,6 +143,7 @@ async def get_main_themes(message: Message):
         kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
         await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
+        await message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -148,6 +155,7 @@ async def on_click_main_theme(callback: CallbackQuery):
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -190,6 +198,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('cnt_by_themes', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -210,6 +219,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('cnt_by_nums', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -225,6 +235,7 @@ async def search_song_by_num(message: Message):
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
+        await message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -283,6 +294,7 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -312,6 +324,7 @@ async def on_click_chords(callback: CallbackQuery):
         metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -323,6 +336,7 @@ async def on_click_text(callback: CallbackQuery):
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         await callback.message.delete()
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -352,6 +366,7 @@ async def on_click_audio(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_audio', callback.from_user)
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -370,6 +385,7 @@ async def on_click_youtube(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
+        await callback.message.answer(text=error_msg)
         logging.exception(e)
 
 
@@ -400,6 +416,7 @@ async def search_song_by_text(message: Message):
         metrics('cnt_by_txt', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
+        await message.answer(text=error_msg)
         logging.exception(e)
 
 
