@@ -343,7 +343,7 @@ async def on_click_text(callback: CallbackQuery):
 @dp.callback_query(F.data == 'audio_btn')  # Обработчик нажатия кнопки "Аудио"
 async def on_click_audio(callback: CallbackQuery):
     try:
-        first_str = callback.message.text.split('\n')[0]
+        first_str = callback.message.text.split('\n')[0] if callback.message.text else callback.message.caption
         num = first_str.split()[0]
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
