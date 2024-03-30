@@ -7,6 +7,10 @@ cp .env.example .env
 ```
 В файле .env ввести свои данные
 
+## Лайхаки для работы с апдейтами:
+print(message.model_dump_json(indent=4, exclude_none=True)) 
+https://jsoneditoronline.org
+
 
 
 ## Ресурсы по aiogram, Webhook, docker etc.

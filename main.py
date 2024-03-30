@@ -1,5 +1,5 @@
 from dotenv import dotenv_values
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, InputMediaAudio,
                            InputMediaDocument, InputMediaPhoto,
@@ -28,7 +28,6 @@ dp = Dispatcher()
 logging.basicConfig(filename='errors.log', level=logging.ERROR,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
 amount_songs = 376
-error_msg = ('Ой, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: @pavvv_ssb')
 
 
 @dp.message(CommandStart())  # Обработчик команды /start
@@ -40,7 +39,10 @@ async def welcome(message: Message):
                              parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
-        await message.answer(text=error_msg)
+        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        await message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef welcome\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -69,20 +71,15 @@ async def get_users_info(message: Message):
         await message.answer(str(e))
 
 
-@dp.message(F.text.in_({'/c1', '/c2', '/c3', '/c4', '/sgm', '/gt', '/tr', '/hill', '/kk', '/fvrt'}))
-async def get_contents(message: Message):  # Функция для получения разных списков песен
+@dp.message(Command(commands=['fvrt', 'sgm', 'gt', 'tr', 'hill', 'kk']))
+async def get_songs_list(message: Message):  # Функция для получения разных списков песен
     try:
         c = message.text
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        if c == '/c1':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num < 101 ORDER BY num")
-        elif c == '/c2':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 101 and 200 ORDER BY num")
-        elif c == '/c3':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 201 and 300 ORDER BY num")
-        elif c == '/c4':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num > 300 ORDER BY num")
+        if c == '/fvrt':
+            cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
+                           f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
         # elif c == '/ch':
         #     cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num = ANY(string_to_array(("
         #                    "SELECT song_nums FROM themes WHERE theme = 'Рождество Христа'), ', ')::int[]) ORDER BY num")
@@ -101,9 +98,6 @@ async def get_contents(message: Message):  # Функция для получе�
         elif c == '/kk':
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Краеугольный Камень%' ORDER BY num")
-        elif c == '/fvrt':
-            cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
-                           f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
         res = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -129,21 +123,87 @@ async def get_contents(message: Message):  # Функция для получе�
                 for elem in content:
                     if elem:
                         await message.answer(elem)
-            metrics('cnt_by_content' if c.startswith('/c') else 'cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers',
-                    message.from_user)
+            metrics('cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers', message.from_user)
             metrics('users', message.from_user)
     except Exception as e:
-        await message.answer(text=error_msg)
+        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        await message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
-@dp.message(F.text == '/thm')  # Обработчик тематического указателя
-async def get_main_themes(message: Message):
+@dp.message(Command(commands=['cont', 'thm', 'help']))
+async def get_cont_thm_help(message: Message):
     try:
-        kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
-        await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
+        c = message.text
+        if c == '/cont':
+            kb = get_context_keyboard()
+            await message.answer(text=f"🗂 <b>Выберете диапазон содержания</b>", parse_mode=ParseMode.HTML,
+                                 reply_markup=kb)
+        elif c == '/thm':
+            kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
+            await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
+        elif c == '/help':
+            await message.answer(text='<b>Об этом боте:</b> \nНа данный момент в боте реализован следующий функционал: '
+                '\nЧтобы получить необходимую песню, нужно отправить её номер боту. Также найти песню можно по названию, '
+                'по любой фразе из песни, по названию на английском или по автору. Знаки препинания и регистр можно не '
+                'учитывать.\nА ещё, выбрав пункт Меню, можно вывести список песен по темам, по некоторым авторам, по '
+                'содержанию или вывести свой список <b>"❤️ Избранное"</b>. Для удобства внизу списка выводятся кнопки с '
+                'номерами песен, при условии что количество песен в списке меньше 25. \nДля большинства песен доступны '
+                'кнопки <b>"Аудио"</b> и <b>"YouTube"</b>, чтобы можно было послушать как оригиналы песен, так и в '
+                'переводе. Это помогает заучивать песни правильно! ☺️\nНадеемся, этот бот будет большим благословением '
+                'для вас. \n❗️ Если вы заметили ошибку, напишите, пожалуйста, разработчику 👨🏻‍💻: <b>@pavvv_ssb</b>\n'
+                '💳 Номер карты для пожертвований: <b>2200 1514 1169 4594</b>', parse_mode=ParseMode.HTML)
     except Exception as e:
-        await message.answer(text=error_msg)
+        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        await message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
+        logging.exception(e)
+
+
+@dp.callback_query(F.data.startswith('cont'))
+async def on_click_content(callback: CallbackQuery):
+    try:
+        c = callback.data
+        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        cursor = conn.cursor()
+        if c == 'cont1':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num < 101 ORDER BY num")
+        elif c == 'cont2':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 101 and 200 ORDER BY num")
+        elif c == 'cont3':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 201 and 300 ORDER BY num")
+        elif c == 'cont4':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num > 300 ORDER BY num")
+        res = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        num_of_songs = len(res)
+        content = ['', '']
+        for i in range(50 if num_of_songs > 50 else num_of_songs):
+            content[0] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                                                                  f'\n        ({res[i][2]})') + (
+                               "" if not res[i][3] else f'\n        ({res[i][3]})'))
+        for i in range(50, num_of_songs):
+            content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                                                                  f'\n        ({res[i][2]})') + (
+                               "" if not res[i][3] else f'\n        ({res[i][3]})'))
+        for elem in content:
+            if elem:
+                await callback.message.answer(elem)
+                await callback.answer()
+        kb = get_context_keyboard()
+        await callback.message.answer(text=f"🗂 <b>Выберете диапазон содержания</b>", parse_mode=ParseMode.HTML,
+                                      reply_markup=kb)
+        metrics('cnt_by_content', callback.message.from_user)
+        metrics('users', callback.message.from_user)
+    except Exception as e:
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -155,7 +215,10 @@ async def on_click_main_theme(callback: CallbackQuery):
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -198,7 +261,10 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('cnt_by_themes', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -219,7 +285,10 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('cnt_by_nums', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -235,7 +304,10 @@ async def search_song_by_num(message: Message):
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        await message.answer(text=error_msg)
+        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        await message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_num\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -294,7 +366,10 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_favorites\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -324,7 +399,10 @@ async def on_click_chords(callback: CallbackQuery):
         metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -336,7 +414,10 @@ async def on_click_text(callback: CallbackQuery):
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         await callback.message.delete()
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_text\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -366,7 +447,10 @@ async def on_click_audio(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_audio', callback.from_user)
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_audio\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -385,7 +469,10 @@ async def on_click_youtube(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
-        await callback.message.answer(text=error_msg)
+        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        await callback.message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_youtube\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -416,7 +503,10 @@ async def search_song_by_text(message: Message):
         metrics('cnt_by_txt', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        await message.answer(text=error_msg)
+        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        await message.answer(text=get_error_msg())
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_text\nuser: '
+                                                      f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
 
@@ -520,6 +610,17 @@ def get_themes_btns(theme):  # Формируем кнопки с темами
                       }
         themes_btns = theme_dict[m_theme_id]
     return themes_btns
+
+
+def get_context_keyboard():
+    cont_btns = {'cont1': '1 - 100', 'cont2': '101 - 200', 'cont3': '201 - 300', 'cont4': f'301 - {amount_songs}'}
+    cont_kb = create_inline_kb(2, **cont_btns)
+    return cont_kb
+
+
+def get_error_msg():
+    error_msg = ('Ой, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: @pavvv_ssb')
+    return error_msg
 
 
 def metrics(act, user_info):  # Аналитика
