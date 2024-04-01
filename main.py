@@ -27,7 +27,7 @@ dp = Dispatcher()
 
 logging.basicConfig(filename='errors.log', level=logging.ERROR,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
-amount_songs = 376
+amount_songs = 377
 
 
 @dp.message(CommandStart())  # Обработчик команды /start
@@ -39,7 +39,7 @@ async def welcome(message: Message):
                              parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = message.from_user, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef welcome\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -47,7 +47,7 @@ async def welcome(message: Message):
 
 
 @dp.message(((F.text.strip().lower() == 'admin') | (F.text.lower().startswith('select'))) &
-            (F.from_user.id == int(config['my_tlgrm_id'])))
+            (F.from_user.id == int(config['my_tg_id'])))
 async def get_users_info(message: Message):
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
@@ -126,7 +126,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
             metrics('cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers', message.from_user)
             metrics('users', message.from_user)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = message.from_user, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -145,7 +145,7 @@ async def get_cont_thm_help(message: Message):
             kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
             await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
         elif c == '/help':
-            await message.answer(text='<b>Об этом боте:</b> \nНа данный момент в боте реализован следующий функционал: '
+            await message.answer(text=f'<b>Об этом боте:</b> \nНа данный момент в боте реализован следующий функционал: '
                 '\nЧтобы получить необходимую песню, нужно отправить её номер боту. Также найти песню можно по названию, '
                 'по любой фразе из песни, по названию на английском или по автору. Знаки препинания и регистр можно не '
                 'учитывать.\nА ещё, выбрав пункт Меню, можно вывести список песен по темам, по некоторым авторам, по '
@@ -153,10 +153,11 @@ async def get_cont_thm_help(message: Message):
                 'номерами песен, при условии что количество песен в списке меньше 25. \nДля большинства песен доступны '
                 'кнопки <b>"Аудио"</b> и <b>"YouTube"</b>, чтобы можно было послушать как оригиналы песен, так и в '
                 'переводе. Это помогает заучивать песни правильно! ☺️\nНадеемся, этот бот будет большим благословением '
-                'для вас. \n❗️ Если вы заметили ошибку, напишите, пожалуйста, разработчику 👨🏻‍💻: <b>@pavvv_ssb</b>\n'
-                '💳 Номер карты для пожертвований: <b>2200 1514 1169 4594</b>', parse_mode=ParseMode.HTML)
+                'для вас. \n❗️ Если вы заметили ошибку, напишите, пожалуйста, разработчику 👨🏻‍💻: '
+                f'<b>{config["my_tg_username"]}</b>\n💳 Номер карты для пожертвований: <b>{config["my_card_num"]}</b>',
+                parse_mode=ParseMode.HTML)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = message.from_user, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -170,37 +171,36 @@ async def on_click_content(callback: CallbackQuery):
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
         if c == 'cont1':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num < 101 ORDER BY num")
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num < 51 ORDER BY num")
         elif c == 'cont2':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 101 and 200 ORDER BY num")
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 51 and 100 ORDER BY num")
         elif c == 'cont3':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 201 and 300 ORDER BY num")
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 101 and 150 ORDER BY num")
         elif c == 'cont4':
-            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num > 300 ORDER BY num")
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 151 and 200 ORDER BY num")
+        elif c == 'cont5':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 201 and 250 ORDER BY num")
+        elif c == 'cont6':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 251 and 300 ORDER BY num")
+        elif c == 'cont7':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN 301 and 350 ORDER BY num")
+        elif c == 'cont8':
+            cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num > 350 ORDER BY num")
         res = cursor.fetchall()
         cursor.close()
         conn.close()
         num_of_songs = len(res)
-        content = ['', '']
-        for i in range(50 if num_of_songs > 50 else num_of_songs):
-            content[0] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
-                                                                  f'\n        ({res[i][2]})') + (
-                               "" if not res[i][3] else f'\n        ({res[i][3]})'))
-        for i in range(50, num_of_songs):
-            content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
-                                                                  f'\n        ({res[i][2]})') + (
-                               "" if not res[i][3] else f'\n        ({res[i][3]})'))
-        for elem in content:
-            if elem:
-                await callback.message.answer(elem)
-                await callback.answer()
+        content = ''
+        for i in range(num_of_songs):
+            content += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                        f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
         kb = get_context_keyboard()
-        await callback.message.answer(text=f"🗂 <b>Выберете диапазон содержания</b>", parse_mode=ParseMode.HTML,
-                                      reply_markup=kb)
+        await callback.message.delete()
+        await callback.message.answer(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
         metrics('cnt_by_content', callback.message.from_user)
         metrics('users', callback.message.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -215,7 +215,7 @@ async def on_click_main_theme(callback: CallbackQuery):
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -261,7 +261,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('cnt_by_themes', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -285,7 +285,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('cnt_by_nums', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -304,7 +304,7 @@ async def search_song_by_num(message: Message):
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = message.from_user, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_num\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -366,7 +366,7 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_favorites\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -385,12 +385,12 @@ async def on_click_chords(callback: CallbackQuery):
         cursor.execute(f"SELECT chords_file_id FROM songs where num = {num}")
         chords_file_id = cursor.fetchone()[0]
         if chords_file_id:
-            await callback.message.answer_photo(photo=chords_file_id, caption=first_str, reply_markup=kb)
             await callback.message.delete()
+            await callback.message.answer_photo(photo=chords_file_id, caption=first_str, reply_markup=kb)
         else:
             file = FSInputFile(f'Chords_jpg/{num}.jpg')
-            photo_info = await callback.message.answer_photo(photo=file, caption=first_str, reply_markup=kb)
             await callback.message.delete()
+            photo_info = await callback.message.answer_photo(photo=file, caption=first_str, reply_markup=kb)
             file_id = photo_info.photo[-1].file_id
             cursor.execute(f"UPDATE songs SET chords_file_id = '{file_id}' WHERE num = {num}")
             conn.commit()
@@ -399,7 +399,7 @@ async def on_click_chords(callback: CallbackQuery):
         metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -411,10 +411,10 @@ async def on_click_text(callback: CallbackQuery):
     try:
         num = callback.message.caption.split()[0]
         result = await return_song(num, callback.from_user.id)
-        await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         await callback.message.delete()
+        await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_text\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -447,7 +447,7 @@ async def on_click_audio(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_audio', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_audio\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -469,7 +469,7 @@ async def on_click_youtube(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_youtube\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -503,7 +503,7 @@ async def search_song_by_text(message: Message):
         metrics('cnt_by_txt', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tlgrm_id'])
+        user_, admin_id = message.from_user, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_text\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -613,13 +613,15 @@ def get_themes_btns(theme):  # Формируем кнопки с темами
 
 
 def get_context_keyboard():
-    cont_btns = {'cont1': '1 - 100', 'cont2': '101 - 200', 'cont3': '201 - 300', 'cont4': f'301 - {amount_songs}'}
-    cont_kb = create_inline_kb(2, **cont_btns)
+    cont_btns = {'cont1': '1 - 50', 'cont2': '51 - 100', 'cont3': '101 - 150', 'cont4': '151 - 200',
+                 'cont5': '201 - 250', 'cont6': '251 - 300', 'cont7': '301 - 350', 'cont8': f'351 - {amount_songs}'}
+    cont_kb = create_inline_kb(4, **cont_btns)
     return cont_kb
 
 
 def get_error_msg():
-    error_msg = ('Ой, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: @pavvv_ssb')
+    error_msg = (f'Ой, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: '
+                 f'{config["my_tg_username"]}')
     return error_msg
 
 
