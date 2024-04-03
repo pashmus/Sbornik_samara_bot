@@ -16,18 +16,10 @@ try:
     from aiogram.enums import ParseMode
     from math import ceil
     import glob
-except Exception as e:
-    print(e)
-    logging.exception(e)
 
-try:
     is_remote = False  # Переключение БД локальной или удалённой-
     config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
-except Exception as e:
-    print(e)
-    logging.exception(e)
 
-try:
     token = config['TG_TOKEN']
     host, user, password, database = config['HOST'], config['USER'], config['PASSWORD'], config['DATABASE']
 
@@ -38,8 +30,8 @@ try:
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
     amount_songs = 377
 except Exception as e:
-    print(e)
     logging.exception(e)
+
 
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
@@ -208,10 +200,10 @@ async def on_click_content(callback: CallbackQuery):
         kb = get_context_keyboard()
         await callback.message.delete()
         await callback.message.answer(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
-        metrics('cnt_by_content', callback.message.from_user)
-        metrics('users', callback.message.from_user)
+        metrics('cnt_by_content', callback.from_user)
+        metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -226,7 +218,7 @@ async def on_click_main_theme(callback: CallbackQuery):
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -272,7 +264,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('cnt_by_themes', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -296,7 +288,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('cnt_by_nums', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -377,7 +369,7 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_favorites\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -410,7 +402,7 @@ async def on_click_chords(callback: CallbackQuery):
         metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -425,7 +417,7 @@ async def on_click_text(callback: CallbackQuery):
         await callback.message.delete()
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_text\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -458,7 +450,7 @@ async def on_click_audio(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_audio', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_audio\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
@@ -480,7 +472,7 @@ async def on_click_youtube(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.message.from_user, int(config['my_tg_id'])
+        user_, admin_id = callback.from_user, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_youtube\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
