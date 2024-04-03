@@ -16,7 +16,7 @@ from aiogram.enums import ParseMode
 from math import ceil
 import glob
 
-is_remote = False  # Переключение БД локальной или удалённой
+is_remote = False  # Переключение БД локальной или удалённой-
 config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
 
 token = config['TG_TOKEN']
