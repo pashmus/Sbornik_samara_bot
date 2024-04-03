@@ -1,34 +1,45 @@
-from dotenv import dotenv_values
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import (CallbackQuery, InlineKeyboardButton,
-                           InlineKeyboardMarkup, InputMediaAudio,
-                           InputMediaDocument, InputMediaPhoto,
-                           InputMediaVideo, Message, FSInputFile)
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.filters import CommandStart
-from aiogram.filters.command import Command
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.methods.send_photo import SendPhoto
-import logging
-import psycopg2
-import datetime
-from aiogram.enums import ParseMode
-from math import ceil
-import glob
+try:
+    from dotenv import dotenv_values
+    from aiogram import Bot, Dispatcher, F
+    from aiogram.types import (CallbackQuery, InlineKeyboardButton,
+                               InlineKeyboardMarkup, InputMediaAudio,
+                               InputMediaDocument, InputMediaPhoto,
+                               InputMediaVideo, Message, FSInputFile)
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.filters import CommandStart
+    from aiogram.filters.command import Command
+    from aiogram.exceptions import TelegramBadRequest
+    from aiogram.methods.send_photo import SendPhoto
+    import logging
+    import psycopg2
+    import datetime
+    from aiogram.enums import ParseMode
+    from math import ceil
+    import glob
+except Exception as e:
+    print(e)
+    logging.exception(e)
 
-is_remote = False  # Переключение БД локальной или удалённой-
-config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
+try:
+    is_remote = False  # Переключение БД локальной или удалённой-
+    config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
+except Exception as e:
+    print(e)
+    logging.exception(e)
 
-token = config['TG_TOKEN']
-host, user, password, database = config['HOST'], config['USER'], config['PASSWORD'], config['DATABASE']
+try:
+    token = config['TG_TOKEN']
+    host, user, password, database = config['HOST'], config['USER'], config['PASSWORD'], config['DATABASE']
 
-bot = Bot(token=token)
-dp = Dispatcher()
+    bot = Bot(token=token)
+    dp = Dispatcher()
 
-logging.basicConfig(filename='errors.log', level=logging.ERROR,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
-amount_songs = 377
-
+    logging.basicConfig(filename='errors.log', level=logging.ERROR,
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
+    amount_songs = 377
+except Exception as e:
+    print(e)
+    logging.exception(e)
 
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
