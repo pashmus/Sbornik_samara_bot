@@ -28,7 +28,7 @@ try:
 
     logging.basicConfig(filename='errors.log', level=logging.ERROR,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
-    amount_songs = 377
+    amount_songs = 378
 except Exception as e:
     logging.exception(e)
 
