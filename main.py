@@ -390,12 +390,12 @@ async def on_click_chords(callback: CallbackQuery):
         msg_tmstmp = callback.message.date.replace(tzinfo=None)
         current_time = datetime.datetime.now().replace(microsecond=0)
         delta = (current_time-msg_tmstmp)
+        expires_after = datetime.timedelta(hours=51)
+        is_msg_spoiled = delta > expires_after
 
         admin_id = int(config['my_tg_id'])
-        await bot.send_message(chat_id=admin_id, text=str(delta))
+        await bot.send_message(chat_id=admin_id, text=str(expires_after - delta))
 
-        expires_after = datetime.timedelta(hours=48)
-        is_msg_spoiled = delta > expires_after
         if chords_file_id:
             await (callback.message.delete() if not is_msg_spoiled else
                    callback.message.edit_text(text='Смотри аккорды ниже...'))
