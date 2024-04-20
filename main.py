@@ -387,12 +387,23 @@ async def on_click_chords(callback: CallbackQuery):
         cursor = conn.cursor()
         cursor.execute(f"SELECT chords_file_id FROM songs where num = {num}")
         chords_file_id = cursor.fetchone()[0]
+        msg_tmstmp = callback.message.date.replace(tzinfo=None)
+        current_time = datetime.datetime.now().replace(microsecond=0)
+        delta = (current_time-msg_tmstmp)
+
+        admin_id = int(config['my_tg_id'])
+        await bot.send_message(chat_id=admin_id, text=str(delta))
+
+        expires_after = datetime.timedelta(hours=48)
+        is_msg_spoiled = delta > expires_after
         if chords_file_id:
-            await callback.message.delete()
+            await (callback.message.delete() if not is_msg_spoiled else
+                   callback.message.edit_text(text='Смотри аккорды ниже...'))
             await callback.message.answer_photo(photo=chords_file_id, caption=first_str, reply_markup=kb)
         else:
             file = FSInputFile(f'Chords_jpg/{num}.jpg')
-            await callback.message.delete()
+            await (callback.message.delete() if not is_msg_spoiled else
+                   callback.message.edit_text(text='Смотри аккорды ниже...'))
             photo_info = await callback.message.answer_photo(photo=file, caption=first_str, reply_markup=kb)
             file_id = photo_info.photo[-1].file_id
             cursor.execute(f"UPDATE songs SET chords_file_id = '{file_id}' WHERE num = {num}")
