@@ -198,7 +198,9 @@ async def on_click_content(callback: CallbackQuery):
             content += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                         f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
         kb = get_context_keyboard()
-        await callback.message.delete()
+        msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
+        await (callback.message.delete() if not msg_spoiled else
+               callback.message.edit_text(text='Смотри ниже...'))
         await callback.message.answer(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
         metrics('cnt_by_content', callback.from_user)
         metrics('users', callback.from_user)
@@ -387,22 +389,14 @@ async def on_click_chords(callback: CallbackQuery):
         cursor = conn.cursor()
         cursor.execute(f"SELECT chords_file_id FROM songs where num = {num}")
         chords_file_id = cursor.fetchone()[0]
-        msg_tmstmp = callback.message.date.replace(tzinfo=None)
-        current_time = datetime.datetime.now().replace(microsecond=0)
-        delta = (current_time-msg_tmstmp)
-        expires_after = datetime.timedelta(hours=51)
-        is_msg_spoiled = delta > expires_after
-
-        admin_id = int(config['my_tg_id'])
-        await bot.send_message(chat_id=admin_id, text=str(expires_after - delta))
-
+        msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
         if chords_file_id:
-            await (callback.message.delete() if not is_msg_spoiled else
+            await (callback.message.delete() if not msg_spoiled else
                    callback.message.edit_text(text='Смотри аккорды ниже...'))
             await callback.message.answer_photo(photo=chords_file_id, caption=first_str, reply_markup=kb)
         else:
             file = FSInputFile(f'Chords_jpg/{num}.jpg')
-            await (callback.message.delete() if not is_msg_spoiled else
+            await (callback.message.delete() if not msg_spoiled else
                    callback.message.edit_text(text='Смотри аккорды ниже...'))
             photo_info = await callback.message.answer_photo(photo=file, caption=first_str, reply_markup=kb)
             file_id = photo_info.photo[-1].file_id
@@ -424,8 +418,10 @@ async def on_click_chords(callback: CallbackQuery):
 async def on_click_text(callback: CallbackQuery):
     try:
         num = callback.message.caption.split()[0]
+        msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
         result = await return_song(num, callback.from_user.id)
-        await callback.message.delete()
+        await (callback.message.delete() if not msg_spoiled else
+               callback.message.edit_text(text='Смотри текст ниже...'))
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
     except Exception as e:
         user_, admin_id = callback.from_user, int(config['my_tg_id'])
@@ -637,6 +633,13 @@ def get_error_msg():
     error_msg = (f'Ой, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: '
                  f'{config["my_tg_username"]}')
     return error_msg
+
+
+def is_msg_spoiled(msg_tmstmp):
+    current_time = datetime.datetime.now().replace(microsecond=0)
+    delta = (current_time - msg_tmstmp)
+    expires_after = datetime.timedelta(hours=51)
+    return delta > expires_after
 
 
 def metrics(act, user_info):  # Аналитика
