@@ -1,36 +1,31 @@
-try:
-    from dotenv import dotenv_values
-    from aiogram import Bot, Dispatcher, F
-    from aiogram.types import (CallbackQuery, InlineKeyboardButton,
-                               InlineKeyboardMarkup, InputMediaAudio,
-                               InputMediaDocument, InputMediaPhoto,
-                               InputMediaVideo, Message, FSInputFile)
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-    from aiogram.filters import CommandStart
-    from aiogram.filters.command import Command
-    from aiogram.exceptions import TelegramBadRequest
-    from aiogram.methods.send_photo import SendPhoto
-    import logging
-    import psycopg2
-    import datetime
-    from aiogram.enums import ParseMode
-    from math import ceil
-    import glob
+from dotenv import dotenv_values
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
+                           InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.filters import CommandStart
+from aiogram.filters.command import Command
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.methods.send_photo import SendPhoto
+import logging
+import psycopg2
+import datetime
+from aiogram.enums import ParseMode
+from math import ceil
+import glob
 
-    is_remote = False  # Переключение БД локальной или удалённой-
-    config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
+is_remote = False  # Переключение БД локальной или удалённой-
+config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
 
-    token = config['TG_TOKEN']
-    host, user, password, database = config['HOST'], config['USER'], config['PASSWORD'], config['DATABASE']
+token = config['TG_TOKEN']
+host, user, password, database = config['HOST'], config['USER'], config['PASSWORD'], config['DATABASE']
 
-    bot = Bot(token=token)
-    dp = Dispatcher()
+bot = Bot(token=token)
+dp = Dispatcher()
 
-    logging.basicConfig(filename='errors.log', level=logging.ERROR,
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
-    amount_songs = 378
-except Exception as e:
-    logging.exception(e)
+logging.basicConfig(filename='errors.log', level=logging.ERROR,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
+amount_songs = 378
 
 
 @dp.message(CommandStart())  # Обработчик команды /start
@@ -129,9 +124,9 @@ async def get_songs_list(message: Message):  # Функция для получ�
             metrics('cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers', message.from_user)
             metrics('users', message.from_user)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = message.from_user, message.text, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -160,9 +155,9 @@ async def get_cont_thm_help(message: Message):
                 f'<b>{config["my_tg_username"]}</b>\n💳 Номер карты для пожертвований: <b>{config["my_card_num"]}</b>',
                 parse_mode=ParseMode.HTML)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = message.from_user, message.text, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -205,9 +200,9 @@ async def on_click_content(callback: CallbackQuery):
         metrics('cnt_by_content', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = callback.from_user, callback.data, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -220,9 +215,9 @@ async def on_click_main_theme(callback: CallbackQuery):
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
-        user_, admin_id = callback.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = callback.from_user, callback.data, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -266,9 +261,9 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('cnt_by_themes', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = callback.from_user, callback.data, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -290,9 +285,9 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('cnt_by_nums', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        user_, admin_id = callback.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = callback.from_user, callback.data, int(config['my_tg_id'])
         await callback.message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -309,9 +304,9 @@ async def search_song_by_num(message: Message):
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = message.from_user, message.text, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_num\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_num; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -392,12 +387,12 @@ async def on_click_chords(callback: CallbackQuery):
         msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
         if chords_file_id:
             await (callback.message.delete() if not msg_spoiled else
-                   callback.message.edit_text(text='Смотри аккорды ниже...'))
+                   callback.message.edit_text(text=f'Аккорды на песню "{first_str}" ниже...'))
             await callback.message.answer_photo(photo=chords_file_id, caption=first_str, reply_markup=kb)
         else:
             file = FSInputFile(f'Chords_jpg/{num}.jpg')
             await (callback.message.delete() if not msg_spoiled else
-                   callback.message.edit_text(text='Смотри аккорды ниже...'))
+                   callback.message.edit_text(text=f'Аккорды на песню "{first_str}" ниже...'))
             photo_info = await callback.message.answer_photo(photo=file, caption=first_str, reply_markup=kb)
             file_id = photo_info.photo[-1].file_id
             cursor.execute(f"UPDATE songs SET chords_file_id = '{file_id}' WHERE num = {num}")
@@ -418,10 +413,7 @@ async def on_click_chords(callback: CallbackQuery):
 async def on_click_text(callback: CallbackQuery):
     try:
         num = callback.message.caption.split()[0]
-        msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
         result = await return_song(num, callback.from_user.id)
-        await (callback.message.delete() if not msg_spoiled else
-               callback.message.edit_text(text='Смотри текст ниже...'))
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
     except Exception as e:
         user_, admin_id = callback.from_user, int(config['my_tg_id'])
@@ -513,9 +505,9 @@ async def search_song_by_text(message: Message):
         metrics('cnt_by_txt', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        user_, admin_id = message.from_user, int(config['my_tg_id'])
+        user_, txt, admin_id = message.from_user, message.text, int(config['my_tg_id'])
         await message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_text\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_text; text: {txt}\nuser: '
                                                       f'{user_.id, user_.username, user_.first_name, user_.last_name}')
         logging.exception(e)
 
@@ -630,7 +622,7 @@ def get_context_keyboard():
 
 
 def get_error_msg():
-    error_msg = (f'Ой, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: '
+    error_msg = (f'Упс, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: '
                  f'{config["my_tg_username"]}')
     return error_msg
 
