@@ -75,32 +75,32 @@ async def get_songs_list(message: Message):  # Функция для получ�
         c = message.text
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        if c == '/fvrt':
+        if c.startswith('/fvrt'):
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
                            f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
-        # elif c == '/ch':
+        # elif  c.startswith('/ch'):
         #     cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num = ANY(string_to_array(("
         #                    "SELECT song_nums FROM themes WHERE theme = 'Рождество Христа'), ', ')::int[]) ORDER BY num")
-        elif c == '/sgm':
+        elif c.startswith('/sgm'):
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Sovereign Grace Music%' ORDER BY num")
-        elif c == '/gt':
+        elif c.startswith('/gt'):
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE authors ILIKE '%Getty%' "
                            "OR authors LIKE '%Townend%' OR authors LIKE '%CityAlight%' ORDER BY num")
-        elif c == '/tr':
+        elif c.startswith('/tr'):
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Tomlin%' OR authors LIKE '%Redman%' ORDER BY num")
-        elif c == '/hill':
+        elif c.startswith('/hill'):
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Hillsong%' ORDER BY num")
-        elif c == '/kk':
+        elif c.startswith('/kk'):
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs "
                            "WHERE authors ILIKE '%Краеугольный Камень%' ORDER BY num")
         res = cursor.fetchall()
         cursor.close()
         conn.close()
         num_of_songs = len(res)
-        if num_of_songs == 0 and c == '/fvrt':
+        if num_of_songs == 0 and c.startswith('/fvrt'):
             await message.answer(text='В папке Избранное пусто. 🤷‍♂️ Чтобы добавить песню в Избранное, '
                                       'нажмите на кнопку с 🤍 под песней.')
         else:
@@ -111,7 +111,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
             for i in range(50, num_of_songs):
                 content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                                f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-            if c in ('/gt', '/tr', '/hill', '/kk') or (c == '/fvrt' and num_of_songs < 25):
+            if c in ('/gt', '/tr', '/hill', '/kk') or (c.startswith('/fvrt') and num_of_songs < 25):
                 btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
                 width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
                          else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
@@ -121,7 +121,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
                 for elem in content:
                     if elem:
                         await message.answer(elem)
-            metrics('cnt_by_fvrt' if c == '/fvrt' else 'cnt_by_singers', message.from_user)
+            metrics('cnt_by_fvrt' if c.startswith('/fvrt') else 'cnt_by_singers', message.from_user)
             metrics('users', message.from_user)
     except Exception as e:
         user_, txt, admin_id = message.from_user, message.text, int(config['my_tg_id'])
@@ -135,14 +135,14 @@ async def get_songs_list(message: Message):  # Функция для получ�
 async def get_cont_thm_help(message: Message):
     try:
         c = message.text
-        if c == '/cont':
+        if c.startswith('/cont'):
             kb = get_context_keyboard()
             await message.answer(text=f"🗂 <b>Выберете диапазон содержания</b>", parse_mode=ParseMode.HTML,
                                  reply_markup=kb)
-        elif c == '/thm':
+        elif c.startswith('/thm'):
             kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
             await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
-        elif c == '/help':
+        elif c.startswith('/help'):
             await message.answer(text=f'<b>Об этом боте:</b> \nНа данный момент в боте реализован следующий функционал: '
                 '\nЧтобы получить необходимую песню, нужно отправить её номер боту. Также найти песню можно по названию, '
                 'по любой фразе из песни, по названию на английском или по автору. Знаки препинания и регистр можно не '
