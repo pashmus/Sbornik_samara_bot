@@ -25,7 +25,7 @@ dp = Dispatcher()
 
 logging.basicConfig(filename='errors.log', level=logging.ERROR,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
-amount_songs = 379
+amount_songs = 381
 
 
 @dp.message(CommandStart())  # Обработчик команды /start
