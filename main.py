@@ -23,8 +23,9 @@ host, user, password, database = config['HOST'], config['USER'], config['PASSWOR
 bot = Bot(token=token)
 dp = Dispatcher()
 
-logging.basicConfig(filename='errors.log', level=logging.ERROR,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # Настройки логгирования
+log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
+logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
+
 amount_songs = 381
 
 
@@ -483,9 +484,10 @@ async def search_song_by_text(message: Message):
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
         cursor = conn.cursor()
-        cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(name || ' ' || "
+        cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(REPLACE(REPLACE(name || ' ' || "
                        f"COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || "
-                       f"COALESCE(authors, ''), 'ё', 'е') @@ PHRASETO_TSQUERY(REPLACE('{message.text}', 'ё', 'е')) "
+                       f"COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния') @@ PHRASETO_TSQUERY"
+                       f"(REPLACE(REPLACE(REPLACE('{message.text}', 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')) "
                        f"ORDER BY num")
         res = cursor.fetchall()
         num_of_songs = len(res) if len(res) < 25 else 24
