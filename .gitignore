@@ -2,3 +2,4 @@
 .env.remote
 errors.log
 /venv/
+/Cheat_sheet.md
