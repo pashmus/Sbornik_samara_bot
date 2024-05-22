@@ -16,7 +16,8 @@ import glob
 
 
 is_remote_db = False  # Переключение БД локальной или удалённой-
-config = load_config(".env.remote") if is_remote_db else load_config(".env")
+config = load_config()
+# config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
 token = config.tg_bot.token
 database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
