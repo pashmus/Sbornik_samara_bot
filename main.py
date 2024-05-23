@@ -1,34 +1,37 @@
-from config_data.config import load_config
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
-                           InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.filters import CommandStart
-from aiogram.filters.command import Command
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.methods.send_photo import SendPhoto
-import logging
-import psycopg2
-import datetime
-from aiogram.enums import ParseMode
-from math import ceil
-import glob
+try:
+    from config_data.config import load_config
+    from aiogram import Bot, Dispatcher, F
+    from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
+                               InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.filters import CommandStart
+    from aiogram.filters.command import Command
+    from aiogram.exceptions import TelegramBadRequest
+    from aiogram.methods.send_photo import SendPhoto
+    import logging
+    import psycopg2
+    import datetime
+    from aiogram.enums import ParseMode
+    from math import ceil
+    import glob
 
 
-is_remote_db = False  # Переключение БД локальной или удалённой-
-config = load_config(".env.remote") if is_remote_db else load_config(".env")
+    is_remote_db = False  # Переключение БД локальной или удалённой-
+    config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
-token = config.tg_bot.token
-database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+    token = config.tg_bot.token
+    database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
 
-bot = Bot(token=token)
-dp = Dispatcher()
+    bot = Bot(token=token)
+    dp = Dispatcher()
 
-log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
-logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_format, style='{')
+    log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
+    logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_format, style='{')
 
-amount_songs = 381
+    amount_songs = 381
 
+except Exception as e:
+    logging.exception(e)
 
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
