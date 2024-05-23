@@ -1,4 +1,5 @@
 try:
+    from environs import Env
     from config_data.config import load_config
     from aiogram import Bot, Dispatcher, F
     from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
@@ -16,7 +17,10 @@ try:
     import glob
 
 
-    is_remote_db = False  # Переключение БД локальной или удалённой-
+    log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
+    logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_format, style='{')
+
+    is_remote_db = False  # Переключение БД локальной или удалённой
     config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
     token = config.tg_bot.token
@@ -25,13 +29,11 @@ try:
     bot = Bot(token=token)
     dp = Dispatcher()
 
-    log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
-    logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_format, style='{')
-
     amount_songs = 381
 
 except Exception as e:
     logging.exception(e)
+
 
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
