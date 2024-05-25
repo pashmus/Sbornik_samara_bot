@@ -1,0 +1,5 @@
+from environs import Env
+
+a = 'AgACAgIAAxkDAAIYAWY2J2RaoxuuzaJcw7e9rjzibCFAAALp2zEbX9SwSQ13381SN-UpAQADAgADdwADNAQ'
+b = 'AgACAgIAAxkDAAIYAWY2J2RaoxuuzaJcw7e9rjzibCFAAALp2zEbX9SwSQ13381SN-UpAQADAgADdwADNAQ'
+print(a==b)
