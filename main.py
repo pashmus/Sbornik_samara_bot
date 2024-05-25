@@ -21,8 +21,10 @@ logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_for
 is_remote_db = False  # Переключение БД локальной или удалённой
 config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
-token = config.tg_bot.token
-database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+token = config['token']
+database, host, user, password = config['database'], config['db_host'], config['db_user'], config['db_password']
+admin_id = int(config['admin_id'])
+admin_username = config['admin_username']
 
 bot = Bot(token=token)
 dp = Dispatcher()
@@ -39,7 +41,7 @@ async def welcome(message: Message):
                              parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
-        bot_user, admin_id = message.from_user, int(config.tg_bot.admin_id)
+        bot_user = message.from_user
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef welcome\nuser: '
                                 f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -47,7 +49,7 @@ async def welcome(message: Message):
 
 
 @dp.message(((F.text.strip().lower() == 'admin') | (F.text.lower().startswith('select'))) &
-            (F.from_user.id == int(config.tg_bot.admin_id)))
+            (F.from_user.id == admin_id))
 async def get_users_info(message: Message):
     try:
         conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
@@ -126,7 +128,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
             metrics('cnt_by_fvrt' if c.startswith('/fvrt') else 'cnt_by_singers', message.from_user)
             metrics('users', message.from_user)
     except Exception as e:
-        bot_user, txt, admin_id = message.from_user, message.text, int(config.tg_bot.admin_id)
+        bot_user, txt = message.from_user, message.text
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -154,10 +156,10 @@ async def get_cont_thm_help(message: Message):
                 'кнопки <b>"Аудио"</b> и <b>"YouTube"</b>, чтобы можно было послушать как оригиналы песен, так и в '
                 'переводе. Это помогает заучивать песни правильно! ☺️\nНадеемся, этот бот будет большим благословением '
                 'для вас. \n❗️ Если вы заметили ошибку, напишите, пожалуйста, разработчику 👨🏻‍💻: '
-                f'<b>{config.tg_bot.admin_username}</b>\n'
-                f'💳 Номер карты для пожертвований: <b>{config.card.card}</b>', parse_mode=ParseMode.HTML)
+                f'<b>{admin_username}</b>\n'
+                f'💳 Номер карты для пожертвований: <b>{config["card"]}</b>', parse_mode=ParseMode.HTML)
     except Exception as e:
-        bot_user, txt, admin_id = message.from_user, message.text, int(config.tg_bot.admin_id)
+        bot_user, txt = message.from_user, message.text
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -202,7 +204,7 @@ async def on_click_content(callback: CallbackQuery):
         metrics('cnt_by_content', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        bot_user, txt, admin_id = callback.from_user, callback.data, int(config.tg_bot.admin_id)
+        bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -217,7 +219,7 @@ async def on_click_main_theme(callback: CallbackQuery):
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
-        bot_user, txt, admin_id = callback.from_user, callback.data, int(config.tg_bot.admin_id)
+        bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -263,7 +265,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('cnt_by_themes', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        bot_user, txt, admin_id = callback.from_user, callback.data, int(config.tg_bot.admin_id)
+        bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back; text: {txt}\nuser:'
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -287,7 +289,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('cnt_by_nums', callback.from_user)
         metrics('users', callback.from_user)
     except Exception as e:
-        bot_user, txt, admin_id = callback.from_user, callback.data, int(config.tg_bot.admin_id)
+        bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -306,7 +308,7 @@ async def search_song_by_num(message: Message):
         metrics('cnt_by_nums', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        bot_user, txt, admin_id = message.from_user, message.text, int(config.tg_bot.admin_id)
+        bot_user, txt = message.from_user, message.text
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_num; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -368,7 +370,7 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
-        bot_user, admin_id = callback.from_user, int(config.tg_bot.admin_id)
+        bot_user = callback.from_user
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_favorites\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -404,7 +406,7 @@ async def on_click_chords(callback: CallbackQuery):
         metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
     except Exception as e:
-        bot_user, admin_id = callback.from_user, int(config.tg_bot.admin_id)
+        bot_user = callback.from_user
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -418,7 +420,7 @@ async def on_click_text(callback: CallbackQuery):
         result = await return_song(num, callback.from_user.id)
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
     except Exception as e:
-        bot_user, admin_id = callback.from_user, int(config.tg_bot.admin_id)
+        bot_user = callback.from_user
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_text\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -451,7 +453,7 @@ async def on_click_audio(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_audio', callback.from_user)
     except Exception as e:
-        bot_user, admin_id = callback.from_user, int(config.tg_bot.admin_id)
+        bot_user = callback.from_user
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_audio\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -473,7 +475,7 @@ async def on_click_youtube(callback: CallbackQuery):
         await callback.answer()
         metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
-        bot_user, admin_id = callback.from_user, int(config.tg_bot.admin_id)
+        bot_user = callback.from_user
         await callback.message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_youtube\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -508,7 +510,7 @@ async def search_song_by_text(message: Message):
         metrics('cnt_by_txt', message.from_user)
         metrics('users', message.from_user)
     except Exception as e:
-        bot_user, txt, admin_id = message.from_user, message.text, int(config.tg_bot.admin_id)
+        bot_user, txt= message.from_user, message.text
         await message.answer(text=get_error_msg())
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_text; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
@@ -626,7 +628,7 @@ def get_context_keyboard():
 
 def get_error_msg():
     error_msg = (f'Упс, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: '
-                 f'{config.tg_bot.admin_username}')
+                 f'{admin_username}')
     return error_msg
 
 
