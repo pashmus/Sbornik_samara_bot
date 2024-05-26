@@ -35,7 +35,7 @@ def load_config(path: str | None = None) -> Config:
 
     return Config(tg_bot=TgBot(
         token=env("BOT_TOKEN"), admin_id=env("TG_ADMIN_ID"), admin_username=env("TG_ADMIN_USERNAME")),
-        db=something(database=env("DATABASE"), db_host=env("HOST"), db_user11=env("USER"), db_password=env("PASSWORD")),
+        db=something(database=env("DATABASE"), db_host=env("HOST"), db_user11=env("USER11"), db_password=env("PASSWORD")),
         card=BankCard(card=env('DONATION_CARD')))
 
 #
