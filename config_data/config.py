@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from environs import Env
+import dotenv
 
 @dataclass
 class DbConfig:
@@ -50,9 +51,19 @@ class Config:
 #         'card':env('DONATION_CARD')
 #     }
 
+# def load_config(path: str | None = None) -> Config:
+#     env: Env = Env()
+#     env.read_env(path)
+#
+#     return Config(tg_bot=TgBot(
+#         token=env("BOT_TOKEN"), admin_id=env("TG_ADMIN_ID"), admin_username=env("TG_ADMIN_USERNAME")),
+#         db=DbConfig(database=env("DATABASE"), db_host=env("HOST"), db_user=env("USER"), db_password=env("PASSWORD")),
+#         card=BankCard(card=env('DONATION_CARD')))
+
+
 def load_config(path: str | None = None) -> Config:
-    env: Env = Env()
-    env.read_env(path)
+    env = dotenv.load_dotenv(path)
+
 
     return Config(tg_bot=TgBot(
         token=env("BOT_TOKEN"), admin_id=env("TG_ADMIN_ID"), admin_username=env("TG_ADMIN_USERNAME")),
