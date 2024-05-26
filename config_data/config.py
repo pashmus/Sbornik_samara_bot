@@ -5,7 +5,7 @@ import os
 
 
 @dataclass
-class DbConfig:
+class DatabaseConfig:
     database: str
     db_host: str
     db_user: str
@@ -27,7 +27,7 @@ class BankCard:
 @dataclass
 class Config:
     tg_bot: TgBot
-    db: DbConfig
+    db: DatabaseConfig
     card: BankCard
 
 
@@ -37,7 +37,7 @@ def load_config(path: str | None = None) -> Config:
 
     return Config(tg_bot=TgBot(
         token=env("BOT_TOKEN"), admin_id=env("TG_ADMIN_ID"), admin_username=env("TG_ADMIN_USERNAME")),
-        db=DbConfig(database=env("DATABASE"), db_host=env("HOST"), db_user=env("USER"), db_password=env("PASSWORD")),
+        db=DatabaseConfig(database=env("DATABASE"), db_host=env("HOST"), db_user=env("USER"), db_password=env("PASSWORD")),
         card=BankCard(card=env('DONATION_CARD')))
 
 #
