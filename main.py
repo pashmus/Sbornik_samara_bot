@@ -23,7 +23,7 @@ config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
 token = config.tg_bot.token
 database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
-admin_id = int(config.tg_bot.admin_id)
+admin_id = config.tg_bot.admin_id
 admin_username = config.tg_bot.admin_username
 
 bot = Bot(token=token)
@@ -157,7 +157,7 @@ async def get_cont_thm_help(message: Message):
                 'переводе. Это помогает заучивать песни правильно! ☺️\nНадеемся, этот бот будет большим благословением '
                 'для вас. \n❗️ Если вы заметили ошибку, напишите, пожалуйста, разработчику 👨🏻‍💻: '
                 f'<b>{admin_username}</b>\n'
-                f'💳 Номер карты для пожертвований: <b>{config["card"]}</b>', parse_mode=ParseMode.HTML)
+                f'💳 Номер карты для пожертвований: <b>{config.card.card}</b>', parse_mode=ParseMode.HTML)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=get_error_msg())
