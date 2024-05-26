@@ -91,12 +91,12 @@ def load_config(path: str | None = None):
     # card=env('DONATION_CARD')
 
     return {
-        'token':env("BOT_TOKEN"),
+        #'token':env("BOT_TOKEN"),
         'admin_id':env("TG_ADMIN_ID"),
         'admin_username':env("TG_ADMIN_USERNAME"),
         'database':env("DATABASE"),
         'db_host':env("HOST"),
-        'db_user':env("USER"),
-        'db_password':env("PASSWORD"),
+        #'db_user':env("USER"),
+        #'db_password':env("PASSWORD"),
         'card':env('DONATION_CARD')
     }

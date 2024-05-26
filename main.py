@@ -1,4 +1,5 @@
-from Sbornik_TEST.config_data.config import load_config
+from environs import Env
+from config_data.config import load_config
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
                            InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
@@ -26,10 +27,17 @@ config = load_config(".env.remote") if is_remote_db else load_config(".env")
 # admin_id = config.tg_bot.admin_id
 # admin_username = config.tg_bot.admin_username
 
-token = config['token']
-database, host, user, password = config['database'], config['db_host'], config['db_user'], config['db_password']
-admin_id = config['admin_id']
-admin_username = config['admin_username']
+env = Env()
+env.read_env()
+
+token=env("BOT_TOKEN")
+admin_id=env("TG_ADMIN_ID")
+admin_username=env("TG_ADMIN_USERNAME")
+database=env("DATABASE")
+host=env("HOST")
+user=env("USER")
+password=env("PASSWORD")
+card=env('DONATION_CARD')
 
 bot = Bot(token=token)
 dp = Dispatcher()
@@ -40,10 +48,11 @@ amount_songs = 381
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
     try:
-        await message.answer(text='<b>Добро пожаловать!</b>\nОтправь боту номер песни или фразу из песни. Также найти '
-                            'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
-                            'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
-                             parse_mode=ParseMode.HTML)
+        # await message.answer(text='<b>Добро пожаловать!</b>\nОтправь боту номер песни или фразу из песни. Также найти '
+        #                     'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
+        #                     'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
+        #                      parse_mode=ParseMode.HTML)
+        await message.answer(text=str(config))
         metrics('users', message.from_user)
     except Exception as e:
         bot_user = message.from_user
