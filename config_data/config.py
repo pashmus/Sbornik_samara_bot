@@ -66,12 +66,37 @@ class Config:
 #         card=BankCard(card=env('DONATION_CARD')))
 
 
-def load_config(path: str | None = None) -> Config:
-    dotenv.load_dotenv(path)
+# def load_config(path: str | None = None) -> Config:
+#     dotenv.load_dotenv(path)
+#
+#     return Config(tg_bot=TgBot(
+#         token=os.getenv("BOT_TOKEN"), admin_id=int(os.getenv("TG_ADMIN_ID")),
+#         admin_username=os.getenv("TG_ADMIN_USERNAME")),
+#         db=DbConfig(database=os.getenv("DATABASE"), db_host=os.getenv("HOST"), db_user=os.getenv("USER"),
+#                     db_password=os.getenv("PASSWORD")),
+#         card=BankCard(card=os.getenv('DONATION_CARD')))
 
-    return Config(tg_bot=TgBot(
-        token=os.getenv("BOT_TOKEN"), admin_id=int(os.getenv("TG_ADMIN_ID")),
-        admin_username=os.getenv("TG_ADMIN_USERNAME")),
-        db=DbConfig(database=os.getenv("DATABASE"), db_host=os.getenv("HOST"), db_user=os.getenv("USER"),
-                    db_password=os.getenv("PASSWORD")),
-        card=BankCard(card=os.getenv('DONATION_CARD')))
+
+def load_config(path: str | None = None):
+    env: Env = Env()
+    env.read_env(path)
+
+    # token=env("BOT_TOKEN")
+    # admin_id=env("TG_ADMIN_ID")
+    # admin_username=env("TG_ADMIN_USERNAME")
+    # database=env("DATABASE")
+    # db_host=env("HOST")
+    # db_user=env("USER")
+    # db_password=env("PASSWORD")
+    # card=env('DONATION_CARD')
+
+    return {
+        'token':env("BOT_TOKEN"),
+        'admin_id':env("TG_ADMIN_ID"),
+        'admin_username':env("TG_ADMIN_USERNAME"),
+        'database':env("DATABASE"),
+        'db_host':env("HOST"),
+        'db_user':env("USER"),
+        'db_password':env("PASSWORD"),
+        'card':env('DONATION_CARD')
+    }
