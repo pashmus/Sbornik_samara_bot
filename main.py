@@ -23,7 +23,7 @@ is_remote_db = False  # Переключение БД локальной или 
 config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
 token11 = config.tg_bot.token
-database11, host11, user11, password11 = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+database11, host11, user11, password11 = config.db.database, config.db.db_host, config.db.db_user11, config.db.db_password
 admin_id11 = config.tg_bot.admin_id
 admin_username11 = config.tg_bot.admin_username
 
