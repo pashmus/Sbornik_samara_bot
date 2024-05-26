@@ -1,4 +1,3 @@
-from environs import Env
 from config_data.config import load_config
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
@@ -22,22 +21,10 @@ logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_for
 is_remote_db = False  # Переключение БД локальной или удалённой
 config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
-token11 = config.tg_bot.token
-database11, host11, user11, password11 = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
-admin_id11 = config.tg_bot.admin_id
-admin_username11 = config.tg_bot.admin_username
-
-env = Env()
-env.read_env()
-
-token=env("BOT_TOKEN")
-admin_id=env("TG_ADMIN_ID")
-admin_username=env("TG_ADMIN_USERNAME")
-database=env("DATABASE")
-host=env("HOST")
-user=env("USER")
-password=env("PASSWORD")
-card=env('DONATION_CARD')
+token = config.tg_bot.token
+database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+admin_id = config.tg_bot.admin_id
+admin_username = config.tg_bot.admin_username
 
 bot = Bot(token=token)
 dp = Dispatcher()
@@ -48,11 +35,10 @@ amount_songs = 381
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
     try:
-        # await message.answer(text='<b>Добро пожаловать!</b>\nОтправь боту номер песни или фразу из песни. Также найти '
-        #                     'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
-        #                     'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
-        #                      parse_mode=ParseMode.HTML)
-        await message.answer(text= token11 + user11 + database11 + password11 + host11)
+        await message.answer(text='<b>Добро пожаловать!</b>\nОтправь боту номер песни или фразу из песни. Также найти '
+                            'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
+                            'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
+                             parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
         bot_user = message.from_user

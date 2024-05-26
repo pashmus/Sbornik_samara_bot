@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from environs import Env
-import dotenv
-import os
 
 
 @dataclass
