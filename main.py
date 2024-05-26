@@ -21,10 +21,10 @@ logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_for
 is_remote_db = False  # Переключение БД локальной или удалённой
 config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
-token = config['token']
-database, host, user, password = config['database'], config['db_host'], config['db_user'], config['db_password']
-admin_id = int(config['admin_id'])
-admin_username = config['admin_username']
+token = config.tg_bot.token
+database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+admin_id = int(config.tg_bot.admin_id)
+admin_username = config.tg_bot.admin_username
 
 bot = Bot(token=token)
 dp = Dispatcher()
