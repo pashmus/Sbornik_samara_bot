@@ -1,5 +1,5 @@
 from environs import Env
-from config_data33.config33 import load_config
+from config_data.config import load_config
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
                            InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
@@ -40,9 +40,9 @@ token=env("BOT_TOKEN")
 admin_id=env("TG_ADMIN_ID")
 admin_username=env("TG_ADMIN_USERNAME")
 database=env("DATABASE")
-host=env("HOST")
-user=env("USER")
-password=env("PASSWORD")
+host=env("DB_HOST")
+user=env("DB_USER")
+password=env("DB_PASSWORD")
 card=env('DONATION_CARD')
 
 bot = Bot(token=token)
