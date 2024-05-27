@@ -1,4 +1,4 @@
-from dotenv import dotenv_values
+from config_data.config import load_config
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
                            InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
@@ -17,13 +17,13 @@ import glob
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
 
-is_remote = False  # Переключение БД локальной или удалённой-
-config = dotenv_values(".env.remote") if is_remote else dotenv_values(".env")
+is_db_remote = False  # Переключение БД локальной или удалённой
+config = load_config(".env.remote") if is_db_remote else load_config(".env")
 
-token = config['BOT_TOKEN']
-database, host, user, password = config['DATABASE'], config['HOST'], config['USER'], config['PASSWORD']
-admin_id = int(config['TG_ADMIN_ID'])
-admin_username = config['TG_ADMIN_USERNAME']
+token = config.tg_bot.token
+admin_id = config.tg_bot.admin_id
+admin_username = config.tg_bot.admin_username
+database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
 
 bot = Bot(token=token)
 dp = Dispatcher()
@@ -155,7 +155,7 @@ async def get_cont_thm_help(message: Message):
                 'кнопки <b>"Аудио"</b> и <b>"YouTube"</b>, чтобы можно было послушать как оригиналы песен, так и в '
                 'переводе. Это помогает заучивать песни правильно! ☺️\nНадеемся, этот бот будет большим благословением '
                 'для вас. \n❗️ Если вы заметили ошибку, напишите, пожалуйста, разработчику 👨🏻‍💻: '
-                f'<b>{admin_username}</b>\n💳 Номер карты для пожертвований: <b>{config["DONATION_CARD"]}</b>',
+                f'<b>{admin_username}</b>\n💳 Номер карты для пожертвований: <b>{config.card.card}</b>',
                 parse_mode=ParseMode.HTML)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
@@ -266,8 +266,8 @@ async def on_click_theme_or_back(callback: CallbackQuery):
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=get_error_msg())
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back; text: {txt}\nuser: '
-                               f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back; text: {txt}\nuser:'
+                               f' {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
 
 
