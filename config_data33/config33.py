@@ -3,10 +3,10 @@ from environs import Env
 
 
 @dataclass
-class dbConfig11:
+class dbConfig:
     database: str
     db_host: str
-    db_user11: str
+    db_user: str
     db_password: str
 
 
@@ -23,19 +23,19 @@ class BankCard:
 
 
 @dataclass
-class Config22:
+class Config:
     tg_bot: TgBot
-    db: dbConfig11
+    db: dbConfig
     card: BankCard
 
 
-def load_config(path: str | None = None) -> Config22:
+def load_config(path: str | None = None) -> Config:
     env: Env = Env()
     env.read_env(path)
 
-    return Config22(tg_bot=TgBot(
+    return Config(tg_bot=TgBot(
         token=env("BOT_TOKEN"), admin_id=env("TG_ADMIN_ID"), admin_username=env("TG_ADMIN_USERNAME")),
-        db=dbConfig11(database=env("DATABASE"), db_host=env("HOST"), db_user11=env("USER"), db_password=env("PASSWORD")),
+        db=dbConfig(database=env("DATABASE"), db_host=env("HOST"), db_user=env("USER"), db_password=env("PASSWORD")),
         card=BankCard(card=env('DONATION_CARD')))
 
 #
