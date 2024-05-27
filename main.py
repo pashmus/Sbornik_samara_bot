@@ -27,24 +27,6 @@ database, host, user, password = config.db.database, config.db.db_host, config.d
 admin_id = config.tg_bot.admin_id
 admin_username = config.tg_bot.admin_username
 
-# token11 = config['token']
-# user11 = config['db_user']
-# database11, host11, user11, password11 = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
-# admin_id11 = config.tg_bot.admin_id
-# admin_username11 = config['admin_username']
-
-# env = Env()
-# env.read_env()
-#
-# token=env("BOT_TOKEN")
-# admin_id=env("TG_ADMIN_ID")
-# admin_username=env("TG_ADMIN_USERNAME")
-# database=env("DATABASE")
-# host=env("DB_HOST")
-# user=env("DB_USER")
-# password=env("DB_PASSWORD")
-# card=env('DONATION_CARD')
-
 bot = Bot(token=token)
 dp = Dispatcher()
 
