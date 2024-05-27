@@ -22,10 +22,16 @@ logging.basicConfig(filename='errors.log', level=logging.WARNING, format=log_for
 is_remote_db = False  # Переключение БД локальной или удалённой
 config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
-token11 = config.tg_bot.token
-database11, host11, user11, password11 = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
-admin_id11 = config.tg_bot.admin_id
-admin_username11 = config.tg_bot.admin_username
+# token11 = config.tg_bot.token
+# database11, host11, user11, password11 = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+# admin_id11 = config.tg_bot.admin_id
+# admin_username11 = config.tg_bot.admin_username
+
+# token11 = config['token']
+# user11 = config['db_user']
+# database11, host11, user11, password11 = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+# admin_id11 = config.tg_bot.admin_id
+# admin_username11 = config['admin_username']
 
 env = Env()
 env.read_env()
@@ -52,7 +58,7 @@ async def welcome(message: Message):
         #                     'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
         #                     'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
         #                      parse_mode=ParseMode.HTML)
-        await message.answer(text = token11 + user11 + database11 + password11 + host11 + admin_username11)
+        await message.answer(text=config)# database11 + password11 + host11)
         metrics('users', message.from_user)
     except Exception as e:
         bot_user = message.from_user
