@@ -29,22 +29,22 @@ class Config:
     db: dbConfig
     card: BankCard
 
-#
-# def load_config(path: str | None = None) -> Config:
-#     env: Env = Env()
-#     env.read_env(path)
-#
-#     return Config(tg_bot=TgBot(
-#         token=env("BOT_TOKEN"), admin_id=env("TG_ADMIN_ID"), admin_username=env("TG_ADMIN_USERNAME")),
-#         db=dbConfig(database=env("DATABASE"), db_host=env("HOST"), db_user=env("USER"), db_password=env("PASSWORD")),
-#         card=BankCard(card=env('DONATION_CARD')))
 
-
-def load_config(path: str | None = None):
+def load_config(path: str | None = None) -> Config:
     env: Env = Env()
     env.read_env(path)
 
-    token=env("BOT_TOKEN")
+    return Config(tg_bot=TgBot(
+        token=env("BOT_TOKEN"), admin_id=env("TG_ADMIN_ID"), admin_username=env("TG_ADMIN_USERNAME")),
+        db=dbConfig(database=env("DATABASE"), db_host=env("DB_HOST"), db_user=env("DB_USER"),
+                    db_password=env("DB_PASSWORD")), card=BankCard(card=env('DONATION_CARD')))
+
+
+# def load_config(path: str | None = None):
+#     env: Env = Env()
+#     env.read_env(path)
+#
+#     token=env("BOT_TOKEN")
     # admin_id=env("TG_ADMIN_ID")
     # admin_username=env("TG_ADMIN_USERNAME")
     # database=env("DATABASE")
@@ -64,11 +64,11 @@ def load_config(path: str | None = None):
     #     'card':env('DONATION_CARD')
     # }
 
-    env_variables = os.environ
-    d = ''
-    for key, value in env_variables.items():
-        d += f'{key}: {value}\n'
-    return d
+    # env_variables = os.environ
+    # d = ''
+    # for key, value in env_variables.items():
+    #     d += f'{key}: {value}\n'
+    # return d
 
 
 
