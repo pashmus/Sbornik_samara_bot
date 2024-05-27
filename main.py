@@ -1,4 +1,3 @@
-from environs import Env
 from config_data.config import load_config
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
@@ -23,9 +22,10 @@ is_remote_db = False  # Переключение БД локальной или 
 config = load_config(".env.remote") if is_remote_db else load_config(".env")
 
 token = config.tg_bot.token
-database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
 admin_id = config.tg_bot.admin_id
 admin_username = config.tg_bot.admin_username
+
+database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
 
 bot = Bot(token=token)
 dp = Dispatcher()
@@ -40,7 +40,6 @@ async def welcome(message: Message):
                             'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
                             'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
                              parse_mode=ParseMode.HTML)
-        # await message.answer(text=config)# database11 + password11 + host11)
         metrics('users', message.from_user)
     except Exception as e:
         bot_user = message.from_user
