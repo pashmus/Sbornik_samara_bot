@@ -1,4 +1,4 @@
-from config_data.config import load_config
+from config_data.config import Config, load_config
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
                            InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
@@ -13,12 +13,13 @@ import datetime
 from aiogram.enums import ParseMode
 from math import ceil
 import glob
+from lexicon.lexicon import get_lex_msg
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
 
 is_db_remote = False  # Переключение БД локальной или удалённой
-config = load_config(".env.remote") if is_db_remote else load_config(".env")
+config: Config = load_config(".env.remote") if is_db_remote else load_config(".env")
 
 token = config.tg_bot.token
 admin_id = config.tg_bot.admin_id
@@ -28,20 +29,15 @@ database, host, user, password = config.db.database, config.db.db_host, config.d
 bot = Bot(token=token)
 dp = Dispatcher()
 
-amount_songs = 381
-
 
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
     try:
-        await message.answer(text='<b>Добро пожаловать!</b>\nОтправь боту номер песни или фразу из песни. Также найти '
-                            'песню можно по названию на английском или по автору!\nА ещё, выбрав пункт <b>Меню</b>, '
-                            'можно вывести список песен по некоторым авторам, по содержанию или "❤️ Избранное".',
-                             parse_mode=ParseMode.HTML)
+        await message.answer(text=get_lex_msg('welcome_msg'), parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
         bot_user = message.from_user
-        await message.answer(text=get_error_msg())
+        await message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef welcome\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -104,8 +100,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
         conn.close()
         num_of_songs = len(res)
         if num_of_songs == 0 and c.startswith('/fvrt'):
-            await message.answer(text='В папке Избранное пусто. 🤷‍♂️ Чтобы добавить песню в Избранное, '
-                                      'нажмите на кнопку с 🤍 под песней.')
+            await message.answer(text=get_lex_msg('fvrt_empty'))
         else:
             content = ['', '']
             for i in range(50 if num_of_songs > 50 else num_of_songs):
@@ -128,13 +123,13 @@ async def get_songs_list(message: Message):  # Функция для получ�
             metrics('users', message.from_user)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_error_msg())
+        await message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
 
 
-@dp.message(Command(commands=['cont', 'thm', 'help']))
+@dp.message(Command(commands=['cont', 'thm', 'about', 'help']))
 async def get_cont_thm_help(message: Message):
     try:
         c = message.text
@@ -145,21 +140,11 @@ async def get_cont_thm_help(message: Message):
         elif c.startswith('/thm'):
             kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
             await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
-        elif c.startswith('/help'):
-            await message.answer(text=f'<b>Об этом боте:</b> \nНа данный момент в боте реализован следующий функционал: '
-                '\nЧтобы получить необходимую песню, нужно отправить её номер боту. Также найти песню можно по названию, '
-                'по любой фразе из песни, по названию на английском или по автору. Знаки препинания и регистр можно не '
-                'учитывать.\nА ещё, выбрав пункт Меню, можно вывести список песен по темам, по некоторым авторам, по '
-                'содержанию или вывести свой список <b>"❤️ Избранное"</b>. Для удобства внизу списка выводятся кнопки с '
-                'номерами песен, при условии что количество песен в списке меньше 25. \nДля большинства песен доступны '
-                'кнопки <b>"Аудио"</b> и <b>"YouTube"</b>, чтобы можно было послушать как оригиналы песен, так и в '
-                'переводе. Это помогает заучивать песни правильно! ☺️\nНадеемся, этот бот будет большим благословением '
-                'для вас. \n❗️ Если вы заметили ошибку, напишите, пожалуйста, разработчику 👨🏻‍💻: '
-                f'<b>{admin_username}</b>\n💳 Номер карты для пожертвований: <b>{config.card.card}</b>',
-                parse_mode=ParseMode.HTML)
+        elif c.startswith('/about') | c.startswith('/help'):
+            await message.answer(text=get_lex_msg('about_bot'), parse_mode=ParseMode.HTML)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_error_msg())
+        await message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -204,7 +189,7 @@ async def on_click_content(callback: CallbackQuery):
         metrics('users', callback.from_user)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -219,7 +204,7 @@ async def on_click_main_theme(callback: CallbackQuery):
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -265,7 +250,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('users', callback.from_user)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back; text: {txt}\nuser:'
                                f' {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -289,7 +274,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('users', callback.from_user)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -308,7 +293,7 @@ async def search_song_by_num(message: Message):
         metrics('users', message.from_user)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_error_msg())
+        await message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_num; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -334,8 +319,7 @@ async def return_song(num, tg_user_id):
                            f'{res[3]}\n{sep}' + (f'\n<b>{res[4]}</b>' if res[4] else '') +
                            (f'\n<i>{res[5]}</i>' if res[5] else '')), kb]
         else:
-            return [False, (f'Песня не найдена. 🤷\nНужно отправить боту номер песни (1-{amount_songs}) или '
-                            f'фразу из песни. Также найти песню можно по названию на английском или по автору!')]
+            return [False, get_lex_msg('not_found_by_num')]
     except Exception as e:
         logging.exception(e)
 
@@ -370,7 +354,7 @@ async def on_click_favorites(callback: CallbackQuery):
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_favorites\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -406,7 +390,7 @@ async def on_click_chords(callback: CallbackQuery):
         await callback.answer()
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -420,7 +404,7 @@ async def on_click_text(callback: CallbackQuery):
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_text\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -453,7 +437,7 @@ async def on_click_audio(callback: CallbackQuery):
         metrics('cnt_by_audio', callback.from_user)
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_audio\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -475,7 +459,7 @@ async def on_click_youtube(callback: CallbackQuery):
         metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_error_msg())
+        await callback.message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_youtube\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -495,8 +479,7 @@ async def search_song_by_text(message: Message):
         num_of_songs = len(res) if len(res) < 25 else 24
         cursor.close()
         conn.close()
-        song_list = '' if res else ('Песня не найдена. 🤷 \nОтправь боту номер песни или фразу из песни. '
-                                    'Также найти песню можно по названию на английском или по автору!')
+        song_list = '' if res else (get_lex_msg('not_found_by_txt'))
         for song in res[0:24]:
             song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f"\n        ({song[2]})") +
                           ("" if not song[3] else f"\n        ({song[3]})"))
@@ -510,7 +493,7 @@ async def search_song_by_text(message: Message):
         metrics('users', message.from_user)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_error_msg())
+        await message.answer(text=get_lex_msg('error_msg'))
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_text; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -564,71 +547,20 @@ def get_themes_btns(theme):  # Формируем кнопки с темами
 
     # Чтобы не доставать списки тем каждый раз, ниже сделаны словари. Обновлять при изменениях тем.
     if theme == 'main_themes':
-        themes_btns = {'&;1;Бог': '🔸 Бог 🔸', '&;2;Иисус Христос': '🔸 Иисус Христос 🔸',
-                       '&;3;Святой Дух': '🔸 Святой Дух 🔸', '&;4;Евангелие': '🔸 Евангелие 🔸',
-                       '&;5;Слово Божие': '🔸 Слово Божие 🔸', '&;6;Христианская жизнь': '🔸 Христианская жизнь 🔸',
-                       '&;7;Церковь': '🔸 Церковь 🔸', '&;8;Будущее': '🔸 Будущее 🔸'}
+        themes_btns = get_lex_msg('themes_btns')
     else:
         m_theme_id = int(theme.split(';')[1])
-        theme_dict = {
-            1: {'%;1;1;Благодать и милость Бога': '🔹 Благодать и милость Бога 🔹',
-                '%;1;2;Верность и неизменность Бога': '🔹 Верность и неизменность Бога 🔹',
-                '%;1;3;Забота Бога': '🔹 Забота Бога 🔹', '%;1;4;Замысел Бога': '🔹 Замысел Бога 🔹',
-                '%;1;5;Качества Бога': '🔹 Качества Бога 🔹', '%;1;6;Любовь Бога': '🔹 Любовь Бога 🔹',
-                '%;1;7;Превосходство Бога': '🔹 Превосходство Бога 🔹', '%;1;8;Святость Бога': '🔹 Святость Бога 🔹',
-                '%;1;9;Слава и величие Бога': '🔹 Слава и величие Бога 🔹', '%;1;10;Творец': '🔹 Творец 🔹',
-                '%;1;11;Троица': '🔹 Троица 🔹', '%;1;12;Царство Бога': '🔹 Царство Бога 🔹'},
-            2: {'%;2;20;Воскресение Христа': '🔹 Воскресение Христа 🔹',
-                '%;2;21;Господство Христа': '🔹 Господство Христа 🔹',
-                '%;2;22;Заместительная жертва Христа': '🔹 Заместительная жертва Христа 🔹',
-                '%;2;23;Крест Христа': '🔹 Крест Христа 🔹', '%;2;24;Любовь Христа': '🔹 Любовь Христа 🔹',
-                '%;2;25;Первосвященство Христа': '🔹 Первосвященство Христа 🔹',
-                '%;2;26;Превосходство Христа': '🔹 Превосходство Христа 🔹',
-                '%;2;27;Рождество Христа': '🔹 Рождество Христа 🔹',
-                '%;2;28;Слава и величие Христа': '🔹 Слава и величие Христа 🔹',
-                '%;2;29;Смирение Христа': '🔹 Смирение Христа 🔹', '%;2;30;Спаситель': '🔹 Спаситель 🔹',
-                '%;2;31;Страдания Христа': '🔹 Страдания Христа 🔹',
-                '%;2;32;Ходатайство Христа': '🔹 Ходатайство Христа 🔹', '%;2;33;Христос – путь': '🔹 Христос – путь 🔹',
-                '%;2;34;Царство Христа': '🔹 Царство Христа 🔹'},
-            3: {'%;3;35;Озарение Святого Духа': '🔹 Озарение Святого Духа 🔹',
-                '%;3;36;Присутствие Святого Духа': '🔹 Присутствие Святого Духа 🔹',
-                '%;3;37;Святой Дух': '🔹 Святой Дух 🔹'},
-            4: {'%;4;15;Искупление': '🔹 Искупление 🔹', '%;4;16;Оправдание': '🔹 Оправдание 🔹',
-                '%;4;17;Прощение': '🔹 Прощение 🔹', '%;4;18;Спасение': '🔹 Спасение 🔹',
-                '%;4;19;Усыновление': '🔹 Усыновление 🔹'},
-            5: {'%;5;38;Слово Божие': '🔹 Слово Божие 🔹'},
-            6: {'%;6;39;Благовестие': '🔹 Благовестие 🔹', '%;6;40;Благодарность Богу': '🔹 Благодарность Богу 🔹',
-                '%;6;41;Вера': '🔹 Вера 🔹', '%;6;42;Грех, борьба с грехом': '🔹 Грех, борьба с грехом 🔹',
-                '%;6;43;Духовная война': '🔹 Духовная война 🔹', '%;6;44;Жажда по Богу': '🔹 Жажда по Богу 🔹',
-                '%;6;45;Зависимость от Бога': '🔹 Зависимость от Бога 🔹',
-                '%;6;46;Испытания и скорби': '🔹 Испытания и скорби 🔹', '%;6;47;Любовь к Богу': '🔹 Любовь к Богу 🔹',
-                '%;6;48;Мир и покой в Боге': '🔹 Мир и покой в Боге 🔹', '%;6;49;Молитва': '🔹 Молитва 🔹',
-                '%;6;50;Надежда и упование на Бога': '🔹 Надежда и упование на Бога 🔹',
-                '%;6;51;Освящение': '🔹 Освящение 🔹', '%;6;52;Познание Бога': '🔹 Познание Бога 🔹',
-                '%;6;53;Покаяние и исповедание': '🔹 Покаяние и исповедание 🔹',
-                '%;6;54;Посвящённость и служение Богу': '🔹 Посвящённость и служение Богу 🔹',
-                '%;6;55;Прославление Бога': '🔹 Прославление Бога 🔹',
-                '%;6;56;Радость и счастье в Боге': '🔹 Радость и счастье в Боге 🔹', '%;6;57;Смирение': '🔹 Смирение 🔹',
-                '%;6;58;Стойкость верующих': '🔹 Стойкость верующих 🔹', '%;6;59;Суетность мира': '🔹 Суетность мира 🔹'},
-            7: {'%;7;60;Единство верующих': '🔹 Единство верующих 🔹', '%;7;61;Причастие': '🔹 Причастие 🔹',
-                '%;7;62;Церковь': '🔹 Церковь 🔹'},
-            8: {'%;8;13;Второе пришествие Христа': '🔹 Второе пришествие Христа 🔹', '%;8;14;Небеса': '🔹 Небеса 🔹'}
-                      }
+        theme_dict = get_lex_msg('theme_dict')
         themes_btns = theme_dict[m_theme_id]
     return themes_btns
 
 
 def get_context_keyboard():
     cont_btns = {'cont1': '1 - 50', 'cont2': '51 - 100', 'cont3': '101 - 150', 'cont4': '151 - 200',
-                 'cont5': '201 - 250', 'cont6': '251 - 300', 'cont7': '301 - 350', 'cont8': f'351 - {amount_songs}'}
+                 'cont5': '201 - 250', 'cont6': '251 - 300', 'cont7': '301 - 350',
+                 'cont8': f'351 - {config.amount_songs.amount_songs}'}
     cont_kb = create_inline_kb(4, **cont_btns)
     return cont_kb
-
-
-def get_error_msg():
-    error_msg = (f'Упс, что-то пошло не так. 🥺\nЕсли ошибка повторяется, сообщите, пожалуйста, разработчику 👨🏻‍💻: '
-                 f'{admin_username}')
-    return error_msg
 
 
 def is_msg_spoiled(msg_tmstmp):

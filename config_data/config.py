@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from environs import Env
 
+amount_songs = 381
+
 
 @dataclass
 class DbConfig:
@@ -23,10 +25,16 @@ class BankCard:
 
 
 @dataclass
+class AmountOfSongs:
+    amount_songs: int
+
+
+@dataclass
 class Config:
     tg_bot: TgBot
     db: DbConfig
     card: BankCard
+    amount_songs: AmountOfSongs
 
 
 def load_config(path: str | None = None) -> Config:
@@ -35,4 +43,5 @@ def load_config(path: str | None = None) -> Config:
     return Config(tg_bot=TgBot(
         token=env("BOT_TOKEN"), admin_id=int(env("TG_ADMIN_ID")), admin_username=env("TG_ADMIN_USERNAME")),
         db=DbConfig(database=env("DATABASE"), db_host=env("DB_HOST"), db_user=env("DB_USER"),
-                    db_password=env("DB_PASSWORD")), card=BankCard(card=env('DONATION_CARD')))
+                    db_password=env("DB_PASSWORD")), card=BankCard(card=env('DONATION_CARD')),
+        amount_songs=AmountOfSongs(amount_songs=amount_songs))
