@@ -13,17 +13,19 @@ import datetime
 from aiogram.enums import ParseMode
 from math import ceil
 import glob
-from lexicon.lexicon import get_lex_msg
+from lexicon.lexicon import Lexicon
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
 
 is_db_remote = False  # Переключение БД локальной или удалённой
 config: Config = load_config(".env.remote") if is_db_remote else load_config(".env")
+lexicon = Lexicon()
 
 token = config.tg_bot.token
 admin_id = config.tg_bot.admin_id
 admin_username = config.tg_bot.admin_username
+donat_card = config.card.card
 database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
 
 bot = Bot(token=token)
@@ -33,11 +35,11 @@ dp = Dispatcher()
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
     try:
-        await message.answer(text=get_lex_msg('welcome_msg'), parse_mode=ParseMode.HTML)
+        await message.answer(text=lexicon.welcome_msgd, parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
         bot_user = message.from_user
-        await message.answer(text=get_lex_msg('error_msg'))
+        await message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef welcome\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -100,7 +102,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
         conn.close()
         num_of_songs = len(res)
         if num_of_songs == 0 and c.startswith('/fvrt'):
-            await message.answer(text=get_lex_msg('fvrt_empty'))
+            await message.answer(text=lexicon.fvrt_empty_msg, parse_mode=ParseMode.HTML)
         else:
             content = ['', '']
             for i in range(50 if num_of_songs > 50 else num_of_songs):
@@ -123,7 +125,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
             metrics('users', message.from_user)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_lex_msg('error_msg'))
+        await message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -141,10 +143,10 @@ async def get_cont_thm_help(message: Message):
             kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
             await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
         elif c.startswith('/about') | c.startswith('/help'):
-            await message.answer(text=get_lex_msg('about_bot'), parse_mode=ParseMode.HTML)
+            await message.answer(text=lexicon.about_bot, parse_mode=ParseMode.HTML)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_lex_msg('error_msg'))
+        await message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -189,7 +191,7 @@ async def on_click_content(callback: CallbackQuery):
         metrics('users', callback.from_user)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_content; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -204,7 +206,7 @@ async def on_click_main_theme(callback: CallbackQuery):
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_main_theme; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -250,7 +252,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         metrics('users', callback.from_user)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_theme_or_back; text: {txt}\nuser:'
                                f' {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -274,7 +276,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
         metrics('users', callback.from_user)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_song_or_back; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -293,7 +295,7 @@ async def search_song_by_num(message: Message):
         metrics('users', message.from_user)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_lex_msg('error_msg'))
+        await message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_num; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -319,7 +321,7 @@ async def return_song(num, tg_user_id):
                            f'{res[3]}\n{sep}' + (f'\n<b>{res[4]}</b>' if res[4] else '') +
                            (f'\n<i>{res[5]}</i>' if res[5] else '')), kb]
         else:
-            return [False, get_lex_msg('not_found_by_num')]
+            return [False, lexicon.not_found_by_num]
     except Exception as e:
         logging.exception(e)
 
@@ -354,7 +356,7 @@ async def on_click_favorites(callback: CallbackQuery):
         await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_favorites\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -390,7 +392,7 @@ async def on_click_chords(callback: CallbackQuery):
         await callback.answer()
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -404,7 +406,7 @@ async def on_click_text(callback: CallbackQuery):
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_text\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -437,7 +439,7 @@ async def on_click_audio(callback: CallbackQuery):
         metrics('cnt_by_audio', callback.from_user)
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_audio\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -459,7 +461,7 @@ async def on_click_youtube(callback: CallbackQuery):
         metrics('cnt_by_youtube', callback.from_user)
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=get_lex_msg('error_msg'))
+        await callback.message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_youtube\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -479,7 +481,7 @@ async def search_song_by_text(message: Message):
         num_of_songs = len(res) if len(res) < 25 else 24
         cursor.close()
         conn.close()
-        song_list = '' if res else (get_lex_msg('not_found_by_txt'))
+        song_list = '' if res else lexicon.not_found_by_txt
         for song in res[0:24]:
             song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f"\n        ({song[2]})") +
                           ("" if not song[3] else f"\n        ({song[3]})"))
@@ -493,7 +495,7 @@ async def search_song_by_text(message: Message):
         metrics('users', message.from_user)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
-        await message.answer(text=get_lex_msg('error_msg'))
+        await message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef search_song_by_text; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
@@ -547,10 +549,10 @@ def get_themes_btns(theme):  # Формируем кнопки с темами
 
     # Чтобы не доставать списки тем каждый раз, ниже сделаны словари. Обновлять при изменениях тем.
     if theme == 'main_themes':
-        themes_btns = get_lex_msg('themes_btns')
+        themes_btns = lexicon.themes_btns
     else:
         m_theme_id = int(theme.split(';')[1])
-        theme_dict = get_lex_msg('theme_dict')
+        theme_dict = lexicon.theme_dict
         themes_btns = theme_dict[m_theme_id]
     return themes_btns
 
