@@ -45,3 +45,11 @@ def load_config(path: str | None = None) -> Config:
         db=DbConfig(database=env("DATABASE"), db_host=env("DB_HOST"), db_user=env("DB_USER"),
                     db_password=env("DB_PASSWORD")), card=BankCard(card=env('DONATION_CARD')),
         amount_songs=AmountOfSongs(amount_songs=amount_songs))
+
+# def load_config_lex(path: str | None = None) -> Config:
+#     env: Env = Env()
+#     env.read_env(path)
+#     return Config(tg_bot=TgBot(
+#         admin_username=env("TG_ADMIN_USERNAME")),
+#         card=BankCard(card=env('DONATION_CARD')),
+#         amount_songs=AmountOfSongs(amount_songs=amount_songs))

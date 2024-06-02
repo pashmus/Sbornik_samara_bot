@@ -35,7 +35,7 @@ dp = Dispatcher()
 @dp.message(CommandStart())  # Обработчик команды /start
 async def welcome(message: Message):
     try:
-        await message.answer(text=lexicon.welcome_msgd, parse_mode=ParseMode.HTML)
+        await message.answer(text=lexicon.welcome_msg, parse_mode=ParseMode.HTML)
         metrics('users', message.from_user)
     except Exception as e:
         bot_user = message.from_user
