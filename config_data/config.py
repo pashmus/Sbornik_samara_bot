@@ -6,7 +6,7 @@ amount_songs = 381
 
 @dataclass
 class DbConfig:
-    database: str
+    db_name: str
     db_host: str
     db_user: str
     db_password: str
@@ -37,19 +37,26 @@ class Config:
     amount_songs: AmountOfSongs
 
 
+@dataclass
+class ConfigLexicon:
+    admin_username: str
+    card: str
+    amount_songs: int
+
+
 def load_config(path: str | None = None) -> Config:
     env: Env = Env()
     env.read_env(path)
     return Config(tg_bot=TgBot(
         token=env("BOT_TOKEN"), admin_id=int(env("TG_ADMIN_ID")), admin_username=env("TG_ADMIN_USERNAME")),
-        db=DbConfig(database=env("DATABASE"), db_host=env("DB_HOST"), db_user=env("DB_USER"),
+        db=DbConfig(db_name=env("DATABASE"), db_host=env("DB_HOST"), db_user=env("DB_USER"),
                     db_password=env("DB_PASSWORD")), card=BankCard(card=env('DONATION_CARD')),
         amount_songs=AmountOfSongs(amount_songs=amount_songs))
 
-# def load_config_lex(path: str | None = None) -> Config:
-#     env: Env = Env()
-#     env.read_env(path)
-#     return Config(tg_bot=TgBot(
-#         admin_username=env("TG_ADMIN_USERNAME")),
-#         card=BankCard(card=env('DONATION_CARD')),
-#         amount_songs=AmountOfSongs(amount_songs=amount_songs))
+
+def config_lexicon() -> ConfigLexicon:
+    env: Env = Env()
+    env.read_env()
+    return ConfigLexicon(admin_username=env("TG_ADMIN_USERNAME"),
+                         card=env("DONATION_CARD"),
+                         amount_songs=amount_songs)

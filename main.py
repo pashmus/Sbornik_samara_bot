@@ -1,12 +1,9 @@
 from config_data.config import Config, load_config
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio,
-                           InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, FSInputFile)
+from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, FSInputFile)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import CommandStart
 from aiogram.filters.command import Command
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.methods.send_photo import SendPhoto
 import logging
 import psycopg2
 import datetime
@@ -26,7 +23,7 @@ token = config.tg_bot.token
 admin_id = config.tg_bot.admin_id
 admin_username = config.tg_bot.admin_username
 donat_card = config.card.card
-database, host, user, password = config.db.database, config.db.db_host, config.db.db_user, config.db.db_password
+db_name, db_host, db_user, db_password = config.db.db_name, config.db.db_host, config.db.db_user, config.db.db_password
 
 bot = Bot(token=token)
 dp = Dispatcher()
@@ -49,7 +46,7 @@ async def welcome(message: Message):
             (F.from_user.id == admin_id))
 async def get_users_info(message: Message):
     try:
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         if message.text.strip().lower() == 'admin':
             cursor.execute(f"SELECT (SELECT COUNT( *) FROM users) AS a, (SELECT COUNT( *) FROM users "
@@ -74,7 +71,7 @@ async def get_users_info(message: Message):
 async def get_songs_list(message: Message):  # Функция для получения разных списков песен
     try:
         c = message.text
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         if c.startswith('/fvrt'):
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
@@ -156,7 +153,7 @@ async def get_cont_thm_help(message: Message):
 async def on_click_content(callback: CallbackQuery):
     try:
         c = callback.data
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         if c == 'cont1':
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num < 51 ORDER BY num")
@@ -222,7 +219,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         else:
             m_theme = callback.message.text.split('"')[1]
             m_theme_id, theme_id = callback.data.split(';')[1], callback.data.split(';')[2]
-            conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+            conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
             cursor = conn.cursor()
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM songs s JOIN theme_song_link tsl "
                            f"ON s.num = tsl.song_num WHERE tsl.theme_id = {int(theme_id)}")
@@ -303,7 +300,7 @@ async def search_song_by_num(message: Message):
 
 async def return_song(num, tg_user_id):
     try:
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"WITH upd_song AS (UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {num} "
                        f"RETURNING num, name, alt_name, text, en_name, authors, chords_file_id, audio_file_id, "
@@ -334,7 +331,7 @@ async def on_click_favorites(callback: CallbackQuery):
         kb.inline_keyboard[0][0].text = '🤍' if song_in_fvrt else '❤️'  # Меняем цвет сердца на кнопке
         tg_user_id = callback.from_user.id
         num = callback.message.text.split()[0] if callback.message.text else callback.message.caption.split()[0]
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM user_song_link WHERE tg_user_id={tg_user_id}")
         user_in_fvrt = cursor.fetchone()
@@ -369,7 +366,7 @@ async def on_click_chords(callback: CallbackQuery):
         kb.inline_keyboard[0][1].text, kb.inline_keyboard[0][1].callback_data = 'Текст', 'txt_btn'
         first_str = callback.message.text.split('\n')[0]
         num = first_str.split()[0]
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"SELECT chords_file_id FROM songs where num = {num}")
         chords_file_id = cursor.fetchone()[0]
@@ -417,7 +414,7 @@ async def on_click_audio(callback: CallbackQuery):
     try:
         first_str = callback.message.text.split('\n')[0] if callback.message.text else callback.message.caption
         num = first_str.split()[0]
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"SELECT audio_file_id FROM songs where num = {num}")
         audio_file_id = cursor.fetchone()[0]
@@ -449,7 +446,7 @@ async def on_click_audio(callback: CallbackQuery):
 async def on_click_youtube(callback: CallbackQuery):
     try:
         num = callback.message.text.split()[0] if callback.message.text else callback.message.caption.split()[0]
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"SELECT youtube_url FROM songs WHERE num = {num}")
         youtube_url = cursor.fetchone()[0]
@@ -470,7 +467,7 @@ async def on_click_youtube(callback: CallbackQuery):
 @dp.message(F.text)  # Обработчик поиска по фразе
 async def search_song_by_text(message: Message):
     try:
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(REPLACE(REPLACE(name || ' ' || "
                        f"COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || "
@@ -532,7 +529,7 @@ def create_inline_kb(width, *args, back_btn = None, **kwargs) -> InlineKeyboardM
 
 
 def get_themes_btns(theme):  # Формируем кнопки с темами
-    # conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+    # conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
     # cursor = conn.cursor()
     # if theme == 'main_themes':
     #     cursor.execute("SELECT * FROM main_themes")
@@ -577,7 +574,7 @@ def metrics(act, user_info):  # Аналитика
         user_id, f_name, l_name, username, lang = (user_info.id, user_info.first_name, user_info.last_name,
                                                    user_info.username, user_info.language_code)
         current_date = datetime.date.today()  # .isoformat()
-        conn = psycopg2.connect(host=host, user=user, password=password, dbname=database)
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         if act == 'users':  # Запись пользователей в таблицу users
             cursor.execute(f"INSERT INTO users (telgrm_user_id, f_name, l_name, username, lang) VALUES ({user_id}, "
