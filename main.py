@@ -1,4 +1,5 @@
 from config_data.config import Config, load_config
+from lexicon.lexicon import Lexicon
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, FSInputFile)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -10,13 +11,13 @@ import datetime
 from aiogram.enums import ParseMode
 from math import ceil
 import glob
-from lexicon.lexicon import Lexicon
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
 
-is_db_remote = False  # Переключение БД локальной или удалённой
-config: Config = load_config(".env.remote") if is_db_remote else load_config(".env")
+# is_db_remote = False  # Переключение БД локальной или удалённой
+# config: Config = load_config(".env.remote") if is_db_remote else load_config(".env")
+config: Config = load_config()
 lexicon = Lexicon()
 
 token = config.tg_bot.token

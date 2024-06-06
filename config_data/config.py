@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from environs import Env
 
 amount_songs = 381
+is_db_remote = False  # Переключение БД локальной или удалённой
+path = ".env.remote" if is_db_remote else ".env"
 
 
 @dataclass
@@ -44,7 +46,7 @@ class ConfigLexicon:
     amount_songs: int
 
 
-def load_config(path: str | None = None) -> Config:
+def load_config() -> Config:
     env: Env = Env()
     env.read_env(path)
     return Config(tg_bot=TgBot(
@@ -56,7 +58,7 @@ def load_config(path: str | None = None) -> Config:
 
 def config_lexicon() -> ConfigLexicon:
     env: Env = Env()
-    env.read_env()
+    env.read_env(path)
     return ConfigLexicon(admin_username=env("TG_ADMIN_USERNAME"),
                          card=env("DONATION_CARD"),
                          amount_songs=amount_songs)
