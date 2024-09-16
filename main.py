@@ -11,6 +11,8 @@ import datetime
 from aiogram.enums import ParseMode
 from math import ceil
 import glob
+import copy
+# import asyncio
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
@@ -109,12 +111,13 @@ async def get_songs_list(message: Message):  # Функция для получ�
             for i in range(50, num_of_songs):
                 content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                                f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-            if c in ('/gt', '/tr', '/hill', '/kk') or (c.startswith('/fvrt') and num_of_songs < 25):
+            if c in ('/gt', '/tr', '/hill', '/kk', '/fvrt'):
                 btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
                 width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
                          else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
-                kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
-                await message.answer(text=content[0], reply_markup=kb)
+                kb = create_inline_kb(width, edit_btn='edit_fvrt' if c == '/fvrt' else None, **btn_nums)  # Вызываем функцию строителя кнопок
+                await message.answer(text=((f"🗂 <b>ИЗБРАННОЕ</b>\n") if c == '/fvrt' else '') + content[0],
+                                     parse_mode=ParseMode.HTML, reply_markup=kb)
             else:
                 for elem in content:
                     if elem:
@@ -134,7 +137,7 @@ async def get_cont_thm_help(message: Message):
     try:
         c = message.text
         if c.startswith('/cont'):
-            kb = get_context_keyboard()
+            kb = get_content_keyboard()
             await message.answer(text=f"🗂 <b>Выберете диапазон содержания</b>", parse_mode=ParseMode.HTML,
                                  reply_markup=kb)
         elif c.startswith('/thm'):
@@ -146,6 +149,125 @@ async def get_cont_thm_help(message: Message):
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help; text: {txt}\nuser: '
+                               f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        logging.exception(e)
+
+
+@dp.callback_query(F.data.startswith('edit_fvrt')) # Редактирование Избранного (удаление песен, полная очистка)
+async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
+    try:
+        tg_user_id = callback.from_user.id
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
+        cursor = conn.cursor()
+        if callback.data.startswith('edit_fvrt_del_song'):
+            num = callback.data.split(';')[1]
+            cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id} AND song_num = {num}")
+            conn.commit()
+        if callback.data == 'edit_fvrt_clear_fvrt':
+            cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id}")
+            conn.commit()
+        cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
+                       f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {tg_user_id}")
+        res = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        num_of_songs = len(res)
+        content = ''
+        for i in range(num_of_songs):
+            content += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                        f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
+        btn_nums = {f"edit_fvrt_del_song;{num[0]}": f"❌ {str(num[0])}" for num in res}
+        width = (5 if ceil(num_of_songs / 5) < ceil(num_of_songs / 4)
+                 else 4 if ceil(num_of_songs / 4) < ceil(num_of_songs / 3) else 3)
+        kb = create_inline_kb(width, clear_fvrt='edit_fvrt_clear_fvrt', back_btn='back_to_fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
+        msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
+        if callback.data.startswith('edit_fvrt_del_song'):
+            await callback.answer(text='Песня удалена из Избранного!')
+        if num_of_songs == 0:
+            await callback.message.edit_text(text=lexicon.clear_fvrt, parse_mode=ParseMode.HTML)
+        else:
+            await (callback.message.delete() if not msg_spoiled else
+                   callback.message.edit_text(text=f'Избранное смотри ниже...'))
+            await callback.message.answer(text=f"🗂 <b>ИЗБРАННОЕ (Режим редактирования)</b>\n" + content,
+                                          parse_mode=ParseMode.HTML, reply_markup=kb)
+    except Exception as e:
+        bot_user, txt = callback.from_user, callback.data
+        await callback.message.answer(text=lexicon.error_msg)
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_edit_or_del_fvrt; text: {txt}\nuser: '
+                               f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        logging.exception(e)
+
+
+# @dp.callback_query(F.data.startswith('del_fvrt'))  # Обработчик нажатия на кнопку УДАЛЕНИЕ песни из избранного
+# async def on_click_del_song_from_fvrt(callback: CallbackQuery):
+#     try:
+#         # num = callback.data.split(';')[1]
+#         #kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект исходной клавиатуры
+#         # tg_user_id = callback.from_user.id
+#         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
+#         cursor = conn.cursor()
+#         cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id} AND song_num = {num}")
+#         conn.commit()
+#         cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
+#                        f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {tg_user_id}")
+#         res = cursor.fetchall()
+#         cursor.close()
+#         conn.close()
+#         num_of_songs = len(res)
+#         content = ''
+#         for i in range(num_of_songs):
+#             content += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+#                         f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
+#         btn_nums = {f"del_fvrt;{num[0]}": f"❌ {str(num[0])}" for num in res}
+#         width = (5 if ceil(num_of_songs / 5) < ceil(num_of_songs / 4)
+#                  else 4 if ceil(num_of_songs / 4) < ceil(num_of_songs / 3) else 3)
+#         kb = create_inline_kb(width, back_btn='fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
+#         msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
+#         await callback.answer(text='Песня удалена из Избранного!')
+#         await (callback.message.delete() if not msg_spoiled else
+#                callback.message.edit_text(text=f'Избранное смотри ниже...'))
+#         await callback.message.answer(text=f"🗂 <b>ИЗБРАННОЕ (Режим редактирования)</b>\n" + content,
+#                                       parse_mode=ParseMode.HTML, reply_markup=kb)
+#     except Exception as e:
+#         bot_user, txt = callback.from_user, callback.data
+#         await callback.message.answer(text=lexicon.error_msg)
+#         await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_del_song_from_fvrt; text: {txt}'
+#                                f'\nuser: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+#         logging.exception(e)
+
+
+@dp.callback_query(F.data == 'back_to_fvrt')
+async def on_click_back_to_fvrt(callback: CallbackQuery):
+    try:
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
+                       f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {callback.from_user.id}")
+        res = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        num_of_songs = len(res)
+        content = ['', '']
+        for i in range(50 if num_of_songs > 50 else num_of_songs):
+            content[0] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                                                                  f'\n        ({res[i][2]})') + (
+                               "" if not res[i][3] else f'\n        ({res[i][3]})'))
+        for i in range(50, num_of_songs):
+            content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
+                                                                  f'\n        ({res[i][2]})') + (
+                               "" if not res[i][3] else f'\n        ({res[i][3]})'))
+        btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
+        width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
+                 else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
+        kb = create_inline_kb(width, edit_btn='edit_fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
+        await callback.message.edit_text(text=(f"🗂 <b>ИЗБРАННОЕ</b>\n") + content[0],
+                                         parse_mode=ParseMode.HTML, reply_markup=kb)
+        metrics('cnt_by_fvrt', callback.from_user)
+        metrics('users', callback.from_user)
+    except Exception as e:
+        bot_user = callback.from_user
+        await callback.message.answer(text=lexicon.error_msg)
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_back_to_fvrt\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
 
@@ -180,7 +302,7 @@ async def on_click_content(callback: CallbackQuery):
         for i in range(num_of_songs):
             content += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                         f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
-        kb = get_context_keyboard()
+        kb = get_content_keyboard()
         msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
         await (callback.message.delete() if not msg_spoiled else
                callback.message.edit_text(text='Смотри ниже...'))
@@ -328,14 +450,20 @@ async def return_song(num, tg_user_id):
 async def on_click_favorites(callback: CallbackQuery):
     try:
         kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект клавиатуры
-        song_in_fvrt: bool = kb.inline_keyboard[0][0].text == '❤️'  # Есть ли песня в избранном
-        kb.inline_keyboard[0][0].text = '🤍' if song_in_fvrt else '❤️'  # Меняем цвет сердца на кнопке
+        heart_is_red: bool = kb.inline_keyboard[0][0].text == '❤️'  # Есть ли песня в избранном (только визуально)
         tg_user_id = callback.from_user.id
         num = callback.message.text.split()[0] if callback.message.text else callback.message.caption.split()[0]
         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM user_song_link WHERE tg_user_id={tg_user_id}")
-        user_in_fvrt = cursor.fetchone()
+        num_of_songs = len(cursor.fetchall())
+        if num_of_songs > 59:
+            await callback.answer()
+            await callback.message.answer(text=lexicon.fvrt_is_full, parse_mode=ParseMode.HTML)
+            return
+        cursor.execute(f"SELECT * FROM user_song_link WHERE tg_user_id={tg_user_id} and song_num = {num}")
+        song_in_fvrt = True if cursor.fetchone() else False
+        kb.inline_keyboard[0][0].text = '🤍' if song_in_fvrt else '❤️'  # Меняем цвет сердца на кнопке
         if song_in_fvrt:
             cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id} AND song_num = {num}")
         else:
@@ -346,12 +474,13 @@ async def on_click_favorites(callback: CallbackQuery):
         if song_in_fvrt:
             await callback.answer(text='Песня удалена из Избранного!')
         else:
-            if user_in_fvrt:
+            if num_of_songs > 0:
                 await callback.answer(text='Песня добавлена в Избранное!')
             else:
                 await callback.answer(text='Песня добавлена в Избранное!\n'
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
-        await callback.message.edit_reply_markup(reply_markup=kb)
+        if song_in_fvrt == heart_is_red:
+            await callback.message.edit_reply_markup(reply_markup=kb)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -517,15 +646,23 @@ def under_song_kb(width: int, in_fvrt: bool, is_audio: bool, is_youtube: bool) -
 
 
 # Функция строителя клавиатуры с номерами песен после списков
-def create_inline_kb(width, *args, back_btn = None, **kwargs) -> InlineKeyboardMarkup:
+def create_inline_kb(width, *args, back_btn = None, edit_btn = None, clear_fvrt = None, **kwargs) -> InlineKeyboardMarkup:
     kb_builder = InlineKeyboardBuilder()
     buttons: list[InlineKeyboardButton] = []
+    clear_btn = InlineKeyboardButton(text='🗑 Очистить Избранное', callback_data=clear_fvrt)
+    bck_btn = InlineKeyboardButton(text='⬅️ Н а з а д', callback_data=back_btn)
+    edt_btn = InlineKeyboardButton(text='✏️ Редактировать', callback_data=edit_btn)
     if kwargs:
         for btn, txt in kwargs.items():
             buttons.append(InlineKeyboardButton(text=txt, callback_data=btn))
     kb_builder.row(*buttons, width=width)
-    if back_btn:
-        kb_builder.row(InlineKeyboardButton(text='⬅️ Н а з а д', callback_data=back_btn))
+    if clear_fvrt:
+        kb_builder.row(clear_btn, bck_btn)
+    else:
+        if back_btn:
+            kb_builder.row(bck_btn)
+        if edit_btn:
+            kb_builder.row(edt_btn)
     return kb_builder.as_markup()
 
 
@@ -555,7 +692,7 @@ def get_themes_btns(theme):  # Формируем кнопки с темами
     return themes_btns
 
 
-def get_context_keyboard():
+def get_content_keyboard():
     cont_btns = {'cont1': '1 - 50', 'cont2': '51 - 100', 'cont3': '101 - 150', 'cont4': '151 - 200',
                  'cont5': '201 - 250', 'cont6': '251 - 300', 'cont7': '301 - 350',
                  'cont8': f'351 - {config.amount_songs.amount_songs}'}
@@ -563,7 +700,7 @@ def get_context_keyboard():
     return cont_kb
 
 
-def is_msg_spoiled(msg_tmstmp):
+def is_msg_spoiled(msg_tmstmp): # Проверяем протухло ли сообщение
     current_time = datetime.datetime.now().replace(microsecond=0)
     delta = (current_time - msg_tmstmp)
     expires_after = datetime.timedelta(hours=51)
@@ -624,3 +761,10 @@ if __name__ == '__main__':  # Запуск бота
         dp.run_polling(bot)
     except Exception as e:
         logging.exception(e)
+
+
+# async def main():
+#     await bot.delete_webhook(drop_pending_updates=True)
+#     await dp.start_polling(bot)
+#
+# asyncio.run(main())
