@@ -11,7 +11,6 @@ import datetime
 from aiogram.enums import ParseMode
 from math import ceil
 import glob
-import copy
 # import asyncio
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
@@ -113,8 +112,7 @@ async def get_songs_list(message: Message):  # Функция для получ�
                                f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
             if c in ('/gt', '/tr', '/hill', '/kk', '/fvrt'):
                 btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
-                width = (8 if ceil(num_of_songs/8) < ceil(num_of_songs/7)
-                         else 7 if ceil(num_of_songs/7) < ceil(num_of_songs/6) else 6)
+                width = row_width(num_of_btns=num_of_songs, max_width=8)
                 kb = create_inline_kb(width, edit_btn='edit_fvrt' if c == '/fvrt' else None, **btn_nums)  # Вызываем функцию строителя кнопок
                 await message.answer(text=((f"🗂 <b>ИЗБРАННОЕ</b>\n") if c == '/fvrt' else '') + content[0],
                                      parse_mode=ParseMode.HTML, reply_markup=kb)
@@ -177,8 +175,7 @@ async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
             content += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                         f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
         btn_nums = {f"edit_fvrt_del_song;{num[0]}": f"❌ {str(num[0])}" for num in res}
-        width = (5 if ceil(num_of_songs / 5) < ceil(num_of_songs / 4)
-                 else 4 if ceil(num_of_songs / 4) < ceil(num_of_songs / 3) else 3)
+        width = row_width(num_of_btns=num_of_songs, max_width=5)
         kb = create_inline_kb(width, clear_fvrt='edit_fvrt_clear_fvrt', back_btn='back_to_fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
         msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
         if callback.data.startswith('edit_fvrt_del_song'):
@@ -219,8 +216,7 @@ async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
 #             content += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
 #                         f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
 #         btn_nums = {f"del_fvrt;{num[0]}": f"❌ {str(num[0])}" for num in res}
-#         width = (5 if ceil(num_of_songs / 5) < ceil(num_of_songs / 4)
-#                  else 4 if ceil(num_of_songs / 4) < ceil(num_of_songs / 3) else 3)
+#         width = row_width(num_of_btns=num_of_songs, max_width=5)
 #         kb = create_inline_kb(width, back_btn='fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
 #         msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
 #         await callback.answer(text='Песня удалена из Избранного!')
@@ -257,8 +253,7 @@ async def on_click_back_to_fvrt(callback: CallbackQuery):
                                                                   f'\n        ({res[i][2]})') + (
                                "" if not res[i][3] else f'\n        ({res[i][3]})'))
         btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
-        width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
-                 else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
+        width = row_width(num_of_btns=num_of_songs, max_width=8)
         kb = create_inline_kb(width, edit_btn='edit_fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
         await callback.message.edit_text(text=(f"🗂 <b>ИЗБРАННОЕ</b>\n") + content[0],
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
@@ -355,8 +350,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
                     content += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else
                                 f"\n        ({song[2]})") + ("" if not song[3] else f"\n        ({song[3]})"))
                     btn_nums[f"song_btn;{song[0]}"] = str(song[0])
-                width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
-                         else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
+                width = row_width(num_of_btns=num_of_songs, max_width=8)
                 # Вызываем функцию строителя кнопок с номерами песен
                 kb = create_inline_kb(width=width, back_btn=f"song_btn;to_themes;{m_theme_id};{m_theme}", **btn_nums)
             else:
@@ -613,8 +607,7 @@ async def search_song_by_text(message: Message):
             song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f"\n        ({song[2]})") +
                           ("" if not song[3] else f"\n        ({song[3]})"))
         btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res[0:24]}
-        width = (8 if ceil(num_of_songs / 8) < ceil(num_of_songs / 7)
-                 else 7 if ceil(num_of_songs / 7) < ceil(num_of_songs / 6) else 6)
+        width = row_width(num_of_btns=num_of_songs, max_width=8) # Вызываем функцию подсчёта оптимальной ширины ряда
         kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
         await message.answer(song_list + f'\n\n❗️ Показаны только первые 24 из {len(res)} найденных песен. '
                                 f'Сформулируйте запрос точнее. 🤷‍♂️' if len(res) > 24 else song_list, reply_markup=kb)
@@ -705,6 +698,13 @@ def is_msg_spoiled(msg_tmstmp): # Проверяем протухло ли со�
     delta = (current_time - msg_tmstmp)
     expires_after = datetime.timedelta(hours=51)
     return delta > expires_after
+
+
+def row_width(num_of_btns, max_width=8): # Функция расчёта оптимальной ширины ряда кнопок
+    l, m, s = max_width, max_width - 1, max_width - 2
+    width = (l if ceil(num_of_btns / l) < ceil(num_of_btns / m)
+             else m if ceil(num_of_btns / m) < ceil(num_of_btns / s) else s)
+    return width
 
 
 def metrics(act, user_info):  # Аналитика
