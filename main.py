@@ -77,7 +77,8 @@ async def get_songs_list(message: Message):  # Функция для получ�
         cursor = conn.cursor()
         if c.startswith('/fvrt'):
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
-                           f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id}")
+                           f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id} "
+                           f"ORDER BY create_ts DESC")
         # elif  c.startswith('/ch'):
         #     cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num = ANY(string_to_array(("
         #                    "SELECT song_nums FROM themes WHERE theme = 'Рождество Христа'), ', ')::int[]) ORDER BY num")
@@ -165,7 +166,8 @@ async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
             cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id}")
             conn.commit()
         cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
-                       f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {tg_user_id}")
+                       f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {tg_user_id} "
+                       f"ORDER BY create_ts DESC")
         res = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -238,7 +240,8 @@ async def on_click_back_to_fvrt(callback: CallbackQuery):
         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
-                       f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {callback.from_user.id}")
+                       f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {callback.from_user.id} "
+                       f"ORDER BY create_ts DESC")
         res = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -642,7 +645,7 @@ def under_song_kb(width: int, in_fvrt: bool, is_audio: bool, is_youtube: bool) -
 def create_inline_kb(width, *args, back_btn = None, edit_btn = None, clear_fvrt = None, **kwargs) -> InlineKeyboardMarkup:
     kb_builder = InlineKeyboardBuilder()
     buttons: list[InlineKeyboardButton] = []
-    clear_btn = InlineKeyboardButton(text='🗑 Очистить Избранное', callback_data=clear_fvrt)
+    clear_btn = InlineKeyboardButton(text='🗑 Удалить ВСЁ', callback_data=clear_fvrt)
     bck_btn = InlineKeyboardButton(text='⬅️ Н а з а д', callback_data=back_btn)
     edt_btn = InlineKeyboardButton(text='✏️ Редактировать', callback_data=edit_btn)
     if kwargs:
