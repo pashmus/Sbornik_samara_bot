@@ -718,8 +718,8 @@ def metrics(act, user_info):  # Аналитика
         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
         if act == 'users':  # Запись пользователей в таблицу users
-            cursor.execute(f"INSERT INTO users (telgrm_user_id, f_name, l_name, username, lang) VALUES ({user_id}, "
-                           f"'{f_name}', '{l_name}', '{username}', '{lang}') ON CONFLICT (telgrm_user_id) DO UPDATE "
+            cursor.execute(f"INSERT INTO users (tg_user_id, f_name, l_name, username, lang) VALUES ({user_id}, "
+                           f"'{f_name}', '{l_name}', '{username}', '{lang}') ON CONFLICT (tg_user_id) DO UPDATE "
                         f"SET u_cnt_msg = users.u_cnt_msg + 1, last_access = current_timestamp(0) + INTERVAL '1 hours'")
         else:  # Запись показателей в таблицу metrics
             cursor.execute(f"SELECT p.id, m.id_period FROM periods p LEFT JOIN metrics m ON p.id = m.id_period "
@@ -741,7 +741,7 @@ def metrics(act, user_info):  # Аналитика
             elif act == 'cnt_by_chords':  # Счётчик нажатия "Аккорды"
                 cursor.execute(f"UPDATE metrics SET cnt_by_chords = cnt_by_chords+1 WHERE id_period = '{id_period[0]}'")
                 cursor.execute(f"UPDATE users SET u_cnt_chords = u_cnt_chords + 1, "
-                            f"last_access = current_timestamp(0) + INTERVAL '1 hours' WHERE telgrm_user_id = {user_id}")
+                            f"last_access = current_timestamp(0) + INTERVAL '1 hours' WHERE tg_user_id = {user_id}")
             elif act == 'cnt_by_singers':  # Счётчик поиска по исполнителям
                 cursor.execute(f"UPDATE metrics SET cnt_by_singers=cnt_by_singers+1 WHERE id_period='{id_period[0]}'")
             elif act == 'cnt_by_themes':  # Счётчик поиска по темам
