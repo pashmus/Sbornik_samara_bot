@@ -35,7 +35,7 @@ dp = Dispatcher()
 async def welcome(message: Message):
     try:
         await message.answer(text=lexicon.welcome_msg, parse_mode=ParseMode.HTML)
-        metrics('users', message.from_user)
+        metrics(act='welcome', user_info=message.from_user, data='/start')
     except Exception as e:
         bot_user = message.from_user
         await message.answer(text=lexicon.error_msg)
@@ -70,7 +70,7 @@ async def get_users_info(message: Message):
 
 
 @dp.message(Command(commands=['fvrt', 'sgm', 'gt', 'tr', 'hill', 'kk']))
-async def get_songs_list(message: Message):  # Функция для получения разных списков песен
+async def get_song_list(message: Message):  # Функция для получения разных списков песен
     try:
         c = message.text
         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
@@ -121,18 +121,17 @@ async def get_songs_list(message: Message):  # Функция для получ�
                 for elem in content:
                     if elem:
                         await message.answer(elem)
-            metrics('cnt_by_fvrt' if c.startswith('/fvrt') else 'cnt_by_singers', message.from_user)
-            metrics('users', message.from_user)
+        metrics(act='get_song_list', user_info=message.from_user, data=c)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_songs_list; text: {txt}\nuser: '
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_song_list; text: {txt}\nuser: '
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
 
 
 @dp.message(Command(commands=['cont', 'thm', 'about', 'help']))
-async def get_cont_thm_help(message: Message):
+async def get_cont_thm_about_help(message: Message):
     try:
         c = message.text
         if c.startswith('/cont'):
@@ -144,11 +143,12 @@ async def get_cont_thm_help(message: Message):
             await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
         elif c.startswith('/about') | c.startswith('/help'):
             await message.answer(text=lexicon.about_bot, parse_mode=ParseMode.HTML)
+        metrics(act='get_cont_thm_about_help', user_info=message.from_user, data=c)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_help; text: {txt}\nuser: '
-                               f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_cont_thm_about_help; text: {txt}\n'
+                                f'user: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
 
 
@@ -156,13 +156,14 @@ async def get_cont_thm_help(message: Message):
 async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
     try:
         tg_user_id = callback.from_user.id
+        data = callback.data
         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
-        if callback.data.startswith('edit_fvrt_del_song'):
+        if data.startswith('edit_fvrt_del_song'):
             num = callback.data.split(';')[1]
             cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id} AND song_num = {num}")
             conn.commit()
-        if callback.data == 'edit_fvrt_clear_fvrt':
+        if data == 'edit_fvrt_clear_fvrt':
             cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id}")
             conn.commit()
         cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
@@ -189,6 +190,7 @@ async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
                    callback.message.edit_text(text=f'Избранное смотри ниже...'))
             await callback.message.answer(text=f"🗂 <b>ИЗБРАННОЕ (Режим редактирования)</b>\n" + content,
                                           parse_mode=ParseMode.HTML, reply_markup=kb)
+        metrics(act='on_click_edit_or_del_fvrt', user_info=callback.from_user, data=data)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -260,8 +262,7 @@ async def on_click_back_to_fvrt(callback: CallbackQuery):
         kb = create_inline_kb(width, edit_btn='edit_fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
         await callback.message.edit_text(text=(f"🗂 <b>ИЗБРАННОЕ</b>\n") + content[0],
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
-        metrics('cnt_by_fvrt', callback.from_user)
-        metrics('users', callback.from_user)
+        metrics(act='on_click_back_to_fvrt', user_info=callback.from_user, data='back_to_fvrt')
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -305,8 +306,7 @@ async def on_click_content(callback: CallbackQuery):
         await (callback.message.delete() if not msg_spoiled else
                callback.message.edit_text(text='Смотри ниже...'))
         await callback.message.answer(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
-        metrics('cnt_by_content', callback.from_user)
-        metrics('users', callback.from_user)
+        metrics(act='on_click_content', user_info=callback.from_user, data=c)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -322,6 +322,7 @@ async def on_click_main_theme(callback: CallbackQuery):
         kb = create_inline_kb(width=1, back_btn='to_main_themes_btn', **get_themes_btns(callback.data))
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
+        metrics(act='on_click_main_theme', user_info=callback.from_user, data=callback.data)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -333,20 +334,21 @@ async def on_click_main_theme(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith('to_main_themes_btn') | F.data.startswith('%;')) # Обработчик нажатия на тему или Назад
 async def on_click_theme_or_back(callback: CallbackQuery):
     try:
-        if callback.data == 'to_main_themes_btn':
+        data = callback.data
+        if data == 'to_main_themes_btn':
             kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
             await callback.message.edit_text(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML,
                                              reply_markup=kb)
         else:
             m_theme = callback.message.text.split('"')[1]
-            m_theme_id, theme_id = callback.data.split(';')[1], callback.data.split(';')[2]
+            m_theme_id, theme_id = data.split(';')[1], data.split(';')[2]
             conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
             cursor = conn.cursor()
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM songs s JOIN theme_song_link tsl "
                            f"ON s.num = tsl.song_num WHERE tsl.theme_id = {int(theme_id)}")
             res = cursor.fetchall()
             num_of_songs = len(res)
-            content = f"🔹 <b>{callback.data.split(';')[3]}:</b>\n"
+            content = f"🔹 <b>{data.split(';')[3]}:</b>\n"
             btn_nums = {}
             if num_of_songs < 25:
                 for song in res:
@@ -365,8 +367,7 @@ async def on_click_theme_or_back(callback: CallbackQuery):
             await callback.message.edit_text(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
             cursor.close()
             conn.close()
-        metrics('cnt_by_themes', callback.from_user)
-        metrics('users', callback.from_user)
+        metrics(act='on_click_theme_or_back', user_info=callback.from_user, data=data)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -389,8 +390,7 @@ async def on_click_song_or_back(callback: CallbackQuery):
             await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML,
                                    reply_markup=result[2])
             await callback.answer()
-        metrics('cnt_by_nums', callback.from_user)
-        metrics('users', callback.from_user)
+        metrics(act='on_click_song_or_back', user_info=callback.from_user, data=callback.data)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -408,8 +408,7 @@ async def search_song_by_num(message: Message):
             await message.answer(result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         else:
             await message.answer(result[1])
-        metrics('cnt_by_nums', message.from_user)
-        metrics('users', message.from_user)
+        metrics(act='search_song_by_num', user_info=message.from_user, data=f'{num}')
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -478,6 +477,8 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         if song_in_fvrt == heart_is_red:
             await callback.message.edit_reply_markup(reply_markup=kb)
+        metrics(act='on_click_favorites', user_info=callback.from_user,
+                data=f'on_click_red_heart {num}' if song_in_fvrt else f'on_click_white_heart {num}')
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -512,8 +513,8 @@ async def on_click_chords(callback: CallbackQuery):
             conn.commit()
         cursor.close()
         conn.close()
-        metrics('cnt_by_chords', callback.from_user)
         await callback.answer()
+        metrics(act='on_click_chords', user_info=callback.from_user, data=num)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -527,7 +528,9 @@ async def on_click_text(callback: CallbackQuery):
     try:
         num = callback.message.caption.split()[0]
         result = await return_song(num, callback.from_user.id)
+        await callback.answer()
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
+        metrics(act='on_click_txt_btn', user_info=callback.from_user, data=num)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -560,7 +563,7 @@ async def on_click_audio(callback: CallbackQuery):
         cursor.close()
         conn.close()
         await callback.answer()
-        metrics('cnt_by_audio', callback.from_user)
+        metrics(act='on_click_audio', user_info=callback.from_user, data=num)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -582,7 +585,7 @@ async def on_click_youtube(callback: CallbackQuery):
         for elem in youtube_url.split(','):
             await callback.message.answer(text=elem)
         await callback.answer()
-        metrics('cnt_by_youtube', callback.from_user)
+        metrics(act='on_click_youtube', user_info=callback.from_user, data=num)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -594,13 +597,13 @@ async def on_click_youtube(callback: CallbackQuery):
 @dp.message(F.text)  # Обработчик поиска по фразе
 async def search_song_by_text(message: Message):
     try:
+        txt = message.text
         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
-        cursor.execute(f"SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(REPLACE(REPLACE(name || ' ' || "
-                       f"COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || "
-                       f"COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния') @@ PHRASETO_TSQUERY"
-                       f"(REPLACE(REPLACE(REPLACE('{message.text}', 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')) "
-                       f"ORDER BY num")
+        cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(REPLACE(REPLACE(name || ' ' || "
+                       "COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || "
+                       "COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния') @@ PHRASETO_TSQUERY"
+                       f"(REPLACE(REPLACE(REPLACE('{txt}', 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')) ORDER BY num")
         res = cursor.fetchall()
         num_of_songs = len(res) if len(res) < 25 else 24
         cursor.close()
@@ -614,8 +617,7 @@ async def search_song_by_text(message: Message):
         kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
         await message.answer(song_list + f'\n\n❗️ Показаны только первые 24 из {len(res)} найденных песен. '
                                 f'Сформулируйте запрос точнее. 🤷‍♂️' if len(res) > 24 else song_list, reply_markup=kb)
-        metrics('cnt_by_txt', message.from_user)
-        metrics('users', message.from_user)
+        metrics(act='search_song_by_text', user_info=message.from_user, data=txt)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -710,48 +712,54 @@ def row_width(num_of_btns, max_width=8): # Функция расчёта опт�
     return width
 
 
-def metrics(act, user_info):  # Аналитика
+def metrics(act, user_info, data=None):  # Аналитика
     try:
         user_id, f_name, l_name, username, lang = (user_info.id, user_info.first_name, user_info.last_name,
                                                    user_info.username, user_info.language_code)
         current_date = datetime.date.today()  # .isoformat()
         conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
         cursor = conn.cursor()
-        if act == 'users':  # Запись пользователей в таблицу users
-            cursor.execute(f"INSERT INTO users (tg_user_id, f_name, l_name, username, lang) VALUES ({user_id}, "
-                           f"'{f_name}', '{l_name}', '{username}', '{lang}') ON CONFLICT (tg_user_id) DO UPDATE "
-                        f"SET u_cnt_msg = users.u_cnt_msg + 1, last_access = current_timestamp(0) + INTERVAL '1 hours'")
-        else:  # Запись показателей в таблицу metrics
-            cursor.execute(f"SELECT p.id, m.id_period FROM periods p LEFT JOIN metrics m ON p.id = m.id_period "
-                           f"WHERE current_date BETWEEN p.dt_beg and p.dt_end")
-            id_period = cursor.fetchone()
-            if not id_period[1]:  # Если текущего периода в metrics ещё нет, то...
-                id_prev_period = str(datetime.date(current_date.year, current_date.month - 1, 1))[:7] \
-                    if current_date.month > 1 else str(datetime.date(current_date.year - 1, 12, 1))[:7]
-                cursor.execute(f"UPDATE metrics SET cnt_by_users = (SELECT COUNT(u.*) FROM users u JOIN periods p "
-                               f"ON p.id = '{id_prev_period}' WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end) "
-                               f"WHERE id_period = '{id_prev_period}'")  # Запись кол-ва юзеров в прошлом месяце в metrics
-                cursor.execute(f"INSERT INTO metrics (id_period) VALUES ('{id_period[0]}')")  # Запись новой строки в metrics
-            if act == 'cnt_by_content':  # Счётчик использования содержания
-                cursor.execute(f"UPDATE metrics SET cnt_by_content=cnt_by_content+1 WHERE id_period = '{id_period[0]}'")
-            elif act == 'cnt_by_nums':  # Счётчик поиска по номерам
-                cursor.execute(f"UPDATE metrics SET cnt_by_nums = cnt_by_nums + 1 WHERE id_period = '{id_period[0]}'")
-            elif act == 'cnt_by_txt':  # Счётчик поиска по фразе
-                cursor.execute(f"UPDATE metrics SET cnt_by_txt = cnt_by_txt + 1 WHERE id_period = '{id_period[0]}'")
-            elif act == 'cnt_by_chords':  # Счётчик нажатия "Аккорды"
-                cursor.execute(f"UPDATE metrics SET cnt_by_chords = cnt_by_chords+1 WHERE id_period = '{id_period[0]}'")
-                cursor.execute(f"UPDATE users SET u_cnt_chords = u_cnt_chords + 1, "
-                            f"last_access = current_timestamp(0) + INTERVAL '1 hours' WHERE tg_user_id = {user_id}")
-            elif act == 'cnt_by_singers':  # Счётчик поиска по исполнителям
-                cursor.execute(f"UPDATE metrics SET cnt_by_singers=cnt_by_singers+1 WHERE id_period='{id_period[0]}'")
-            elif act == 'cnt_by_themes':  # Счётчик поиска по темам
-                cursor.execute(f"UPDATE metrics SET cnt_by_themes = cnt_by_themes+1 WHERE id_period = '{id_period[0]}'")
-            elif act == 'cnt_by_fvrt':  # Счётчик поиска избранному
-                cursor.execute(f"UPDATE metrics SET cnt_by_fvrt = cnt_by_fvrt + 1 WHERE id_period = '{id_period[0]}'")
-            elif act == 'cnt_by_audio':  # Счётчик нажатия "Аудио"
-                cursor.execute(f"UPDATE metrics SET cnt_by_audio = cnt_by_audio + 1 WHERE id_period = '{id_period[0]}'")
-            elif act == 'cnt_by_youtube':  # Счётчик нажатия "YouTube"
-                cursor.execute(f"UPDATE metrics SET cnt_by_youtube = cnt_by_youtube + 1 WHERE id_period = '{id_period[0]}'")
+        # Записывает новых пользователей или обновляет (ков-во использ., дата посл.исп.) старых
+        cursor.execute(f"INSERT INTO users (tg_user_id, f_name, l_name, username, lang) VALUES ({user_id}, "
+                       f"'{f_name}', '{l_name}', '{username}', '{lang}') ON CONFLICT (tg_user_id) DO UPDATE "
+                       f"SET u_cnt_msg = users.u_cnt_msg + 1, last_access = current_timestamp(0) + INTERVAL '1 hours'")
+        # Записываем все действия пользователей
+        cursor.execute(f"INSERT INTO user_actions (tg_user_id, action, data) VALUES ({user_id}, '{act}', '{data}')")
+        # Определяем текущий период
+        cursor.execute("SELECT p.id, m.id_period FROM periods p LEFT JOIN metrics m ON p.id = m.id_period "
+                       "WHERE current_date BETWEEN p.dt_beg and p.dt_end")
+        id_period = cursor.fetchone()
+        if not id_period[1]:  # Если текущего периода в metrics ещё нет, то записываем результат прошедшего месяца и создаём строку с новым в metrix
+            id_prev_period = str(datetime.date(current_date.year, current_date.month - 1, 1))[:7] \
+                if current_date.month > 1 else str(datetime.date(current_date.year - 1, 12, 1))[:7]
+            cursor.execute(f"UPDATE metrics SET cnt_by_users = (SELECT COUNT(u.*) FROM users u JOIN periods p "
+                           f"ON p.id = '{id_prev_period}' WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end) "
+                           f"WHERE id_period = '{id_prev_period}'")  # Запись кол-ва юзеров в прошлом месяце в metrics
+            cursor.execute(f"INSERT INTO metrics (id_period) VALUES ('{id_period[0]}')")  # Запись новой строки в metrics
+
+        # Заполнение счётчиков
+        if act == 'on_click_content':  # Счётчик использования содержания
+            cursor.execute(f"UPDATE metrics SET cnt_by_content=cnt_by_content+1 WHERE id_period = '{id_period[0]}'")
+        elif data in ('/sgm', '/gt', '/tr', '/hill', '/kk'): # Счётчик поиска по исполнителям
+            cursor.execute(f"UPDATE metrics SET cnt_by_singers=cnt_by_singers+1 WHERE id_period='{id_period[0]}'")
+        elif act == 'on_click_theme_or_back' and data != 'to_main_themes_btn':  # Счётчик поиска по темам
+            cursor.execute(f"UPDATE metrics SET cnt_by_themes = cnt_by_themes+1 WHERE id_period = '{id_period[0]}'")
+        # Счётчик использования избранного
+        elif (act in ('on_click_back_to_fvrt', 'on_click_edit_or_del_fvrt', 'on_click_favorites')) or data == '/fvrt':
+            cursor.execute(f"UPDATE metrics SET cnt_by_fvrt = cnt_by_fvrt + 1 WHERE id_period = '{id_period[0]}'")
+        # Счётчик по номерам песен
+        elif (act == 'search_song_by_num') or (act == 'on_click_song_or_back' and data.split(';')[1] != 'to_themes'):
+            cursor.execute(f"UPDATE metrics SET cnt_by_nums = cnt_by_nums + 1 WHERE id_period = '{id_period[0]}'")
+        elif act == 'search_song_by_text':  # Счётчик поиска по фразе
+            cursor.execute(f"UPDATE metrics SET cnt_by_txt = cnt_by_txt + 1 WHERE id_period = '{id_period[0]}'")
+        elif act == 'on_click_chords':  # Счётчик нажатия "Аккорды" в том числе в users
+            cursor.execute(f"UPDATE metrics SET cnt_by_chords = cnt_by_chords+1 WHERE id_period = '{id_period[0]}'")
+            cursor.execute("UPDATE users SET u_cnt_chords = u_cnt_chords + 1, "
+                           f"last_access = current_timestamp(0) + INTERVAL '1 hours' WHERE tg_user_id = {user_id}")
+        elif act == 'on_click_audio':  # Счётчик нажатия "Аудио"
+            cursor.execute(f"UPDATE metrics SET cnt_by_audio = cnt_by_audio + 1 WHERE id_period = '{id_period[0]}'")
+        elif act == 'on_click_youtube':  # Счётчик нажатия "YouTube"
+            cursor.execute(f"UPDATE metrics SET cnt_by_youtube = cnt_by_youtube + 1 WHERE id_period = '{id_period[0]}'")
         conn.commit()
         cursor.close()
         conn.close()
