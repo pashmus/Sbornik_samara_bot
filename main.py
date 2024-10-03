@@ -767,6 +767,30 @@ def metrics(cursor, act, user_info, data=None):  # Аналитика
         logging.exception(e)
 
 
+# Триггеры, функции, используемые в БД
+#
+# Функция при первом юзере за день, записывает кол-во юзеров вчера
+# CREATE OR REPLACE FUNCTION insert_daily_users()
+# RETURNS trigger as $$
+# BEGIN
+# 	IF NOT EXISTS (SELECT 1 FROM daily_users_count WHERE create_ts::date = (now() + interval '1 hour')::date)
+# 	then
+# 	insert into daily_users_count (num_of_users) values ((
+# 	select count(distinct tg_user_id) from user_actions
+# 	where create_ts >= (now() + interval '1 hour')::date - interval '1 day' and create_ts < (now() + interval '1 hour')::date));
+# 	END IF;
+# 	RETURN NEW;
+# end;
+# $$ language plpgsql;
+#
+# DROP TRIGGER IF exists daily_users_update_trigger on user_actions;
+#
+# create trigger daily_users_update_trigger
+# after insert on user_actions
+# for each row
+# execute function insert_daily_users();
+
+
 if __name__ == '__main__':  # Запуск бота
     try:
         dp.run_polling(bot)
