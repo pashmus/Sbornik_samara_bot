@@ -731,9 +731,10 @@ def metrics(cursor, act, user_info, data=None):  # Аналитика
                                                    user_info.username, user_info.language_code)
         current_date = datetime.date.today()  # .isoformat()
         # Записывает новых пользователей или обновляет (ков-во использ., дата посл.исп.) старых
-        cursor.execute(f"INSERT INTO users (tg_user_id, f_name, l_name, username, lang) VALUES ({user_id}, "
-                       f"'{f_name}', '{l_name}', '{username}', '{lang}') ON CONFLICT (tg_user_id) DO UPDATE "
-                       f"SET u_cnt_msg = users.u_cnt_msg + 1, last_access = current_timestamp(0) + INTERVAL '1 hours'")
+        query = ("INSERT INTO users (tg_user_id, f_name, l_name, username, lang) VALUES (%s, %s, %s, %s, %s) "
+                "ON CONFLICT (tg_user_id) DO UPDATE SET u_cnt_msg = users.u_cnt_msg + 1, "
+                "last_access = current_timestamp(0) + INTERVAL '1 hours'")
+        cursor.execute(query, (user_id, f_name, l_name, username, lang))
         # Записываем все действия пользователей
         cursor.execute(f"INSERT INTO user_actions (tg_user_id, action, data) VALUES ({user_id}, '{act}', '{data}')")
         # Определяем текущий период
