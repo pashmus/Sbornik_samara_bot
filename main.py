@@ -12,6 +12,7 @@ from aiogram.enums import ParseMode
 from math import ceil
 import glob
 # import asyncio
+import time
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
@@ -409,15 +410,21 @@ async def on_click_song_or_back(callback: CallbackQuery):
 
 @dp.message(F.text.isdigit())  # Обработчик ввода номера песни
 async def search_song_by_num(message: Message):
+    start_time = time.time()
     try:
         num = message.text
+        print(num)
         conn, cursor = open_db_connection()
+        print('connected')
         result = await return_song(num=num, tg_user_id=message.from_user.id, cursor=cursor)  # Вызываем функцию поиска песни
+        print('result')
         if result[0]:
             await message.answer(result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         else:
             await message.answer(result[1])
+        print('answered')
         metrics(act='search_song_by_num', user_info=message.from_user, data=f'{num}', cursor=cursor)
+        print('metrics')
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -426,6 +433,10 @@ async def search_song_by_num(message: Message):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        print('closed')
+        end_time = time.time()
+        exec_time = end_time - start_time
+        print(exec_time)
 
 
 async def return_song(num, tg_user_id, cursor):
