@@ -12,7 +12,6 @@ from aiogram.enums import ParseMode
 from math import ceil
 import glob
 # import asyncio
-import time
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
@@ -36,8 +35,6 @@ dp = Dispatcher()
 async def welcome(message: Message):
     try:
         await message.answer(text=lexicon.welcome_msg, parse_mode=ParseMode.HTML)
-        conn, cursor = open_db_connection()
-        metrics(act='welcome', user_info=message.from_user, data='/start', cursor=cursor)
     except Exception as e:
         bot_user = message.from_user
         await message.answer(text=lexicon.error_msg)
@@ -45,14 +42,14 @@ async def welcome(message: Message):
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
     finally:
-        close_db_connection(conn, cursor)
+        await metrics(act='welcome', user_info=message.from_user, data='/start')
 
 
 @dp.message(((F.text.strip().lower() == 'admin') | (F.text.lower().startswith('select'))) &
             (F.from_user.id == admin_id))
 async def get_users_info(message: Message):
+    conn, cursor = open_db_connection()
     try:
-        conn, cursor = open_db_connection()
         if message.text.strip().lower() == 'admin':
             cursor.execute(f"SELECT (SELECT COUNT( *) FROM users) AS a, (SELECT COUNT( *) FROM users "
                            f"WHERE last_access >= current_date) AS b, (SELECT COUNT(u.*) FROM users u JOIN periods p "
@@ -74,9 +71,9 @@ async def get_users_info(message: Message):
 
 @dp.message(Command(commands=['fvrt', 'sgm', 'gt', 'tr', 'hill', 'kk']))
 async def get_song_list(message: Message):  # Функция для получения разных списков песен
+    conn, cursor = open_db_connection()
     try:
         c = message.text
-        conn, cursor = open_db_connection()
         if c.startswith('/fvrt'):
             cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
                            f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {message.from_user.id} "
@@ -115,14 +112,12 @@ async def get_song_list(message: Message):  # Функция для получе
                 btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
                 width = row_width(num_of_btns=num_of_songs, max_width=8)
                 kb = create_inline_kb(width, edit_btn='edit_fvrt' if c == '/fvrt' else None, **btn_nums)  # Вызываем функцию строителя кнопок
-                await message.answer(text=((f"🗂 <b>ИЗБРАННОЕ</b>\n") if c == '/fvrt' else '') + content[0],
+                await message.answer(text=(f"🗂 <b>ИЗБРАННОЕ</b>\n" if c == '/fvrt' else '') + content[0],
                                      parse_mode=ParseMode.HTML, reply_markup=kb)
             else:
                 for elem in content:
                     if elem:
                         await message.answer(elem)
-        metrics(act='get_song_list' if c in ('/sgm', '/gt', '/tr', '/hill', '/kk') else 'get_song_list_fvrt',
-                user_info=message.from_user, data=c, cursor=cursor)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -131,7 +126,9 @@ async def get_song_list(message: Message):  # Функция для получе
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
-
+        c = message.text
+        await metrics(act='get_song_list' if c in ('/sgm', '/gt', '/tr', '/hill', '/kk') else 'get_song_list_fvrt',
+                      user_info=message.from_user, data=c)
 
 @dp.message(Command(commands=['cont', 'thm', 'about', 'help']))
 async def get_cont_thm_about_help(message: Message):
@@ -146,8 +143,6 @@ async def get_cont_thm_about_help(message: Message):
             await message.answer(text=f"🗂 <b>Выберите категорию</b>", parse_mode=ParseMode.HTML, reply_markup=kb)
         elif c.startswith('/about') | c.startswith('/help'):
             await message.answer(text=lexicon.about_bot, parse_mode=ParseMode.HTML)
-        conn, cursor = open_db_connection()
-        metrics(act='get_cont_thm_about_help', user_info=message.from_user, data=c, cursor=cursor)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -155,15 +150,15 @@ async def get_cont_thm_about_help(message: Message):
                                 f'user: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
     finally:
-        close_db_connection(conn, cursor)
+        await metrics(act='get_cont_thm_about_help', user_info=message.from_user, data=message.text)
 
 
 @dp.callback_query(F.data.startswith('edit_fvrt')) # Редактирование Избранного (удаление песен, полная очистка)
 async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
         tg_user_id = callback.from_user.id
         data = callback.data
-        conn, cursor = open_db_connection()
         if data.startswith('edit_fvrt_del_song'):
             num = callback.data.split(';')[1]
             cursor.execute(f"DELETE FROM user_song_link WHERE tg_user_id = {tg_user_id} AND song_num = {num}")
@@ -193,7 +188,6 @@ async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
                    callback.message.edit_text(text=f'Избранное смотри ниже...'))
             await callback.message.answer(text=f"🗂 <b>ИЗБРАННОЕ (Режим редактирования)</b>\n" + content,
                                           parse_mode=ParseMode.HTML, reply_markup=kb)
-        metrics(act='on_click_edit_or_del_fvrt', user_info=callback.from_user, data=data, cursor=cursor)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -202,6 +196,7 @@ async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='on_click_edit_or_del_fvrt', user_info=callback.from_user, data=callback.data)
 
 
 # @dp.callback_query(F.data.startswith('del_fvrt'))  # Обработчик нажатия на кнопку УДАЛЕНИЕ песни из избранного
@@ -243,8 +238,8 @@ async def on_click_edit_or_del_fvrt(callback: CallbackQuery):
 
 @dp.callback_query(F.data == 'back_to_fvrt')
 async def on_click_back_to_fvrt(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
-        conn, cursor = open_db_connection()
         cursor.execute(f"SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl "
                        f"JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id  = {callback.from_user.id} "
                        f"ORDER BY create_ts DESC")
@@ -262,9 +257,8 @@ async def on_click_back_to_fvrt(callback: CallbackQuery):
         btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
         width = row_width(num_of_btns=num_of_songs, max_width=8)
         kb = create_inline_kb(width, edit_btn='edit_fvrt', **btn_nums)  # Вызываем функцию строителя кнопок
-        await callback.message.edit_text(text=(f"🗂 <b>ИЗБРАННОЕ</b>\n") + content[0],
+        await callback.message.edit_text(text=f"🗂 <b>ИЗБРАННОЕ</b>\n" + content[0],
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
-        metrics(act='on_click_back_to_fvrt', user_info=callback.from_user, data='back_to_fvrt', cursor=cursor)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -273,13 +267,14 @@ async def on_click_back_to_fvrt(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='on_click_back_to_fvrt', user_info=callback.from_user, data='back_to_fvrt')
 
 
 @dp.callback_query(F.data.startswith('cont'))
 async def on_click_content(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
         c = callback.data
-        conn, cursor = open_db_connection()
         if c == 'cont1':
             cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE num < 51 ORDER BY num")
         elif c == 'cont2':
@@ -307,7 +302,6 @@ async def on_click_content(callback: CallbackQuery):
         await (callback.message.delete() if not msg_spoiled else
                callback.message.edit_text(text='Смотри ниже...'))
         await callback.message.answer(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
-        metrics(act='on_click_content', user_info=callback.from_user, data=c, cursor=cursor)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -316,6 +310,7 @@ async def on_click_content(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='on_click_content', user_info=callback.from_user, data=callback.data)
 
 
 @dp.callback_query(F.data.startswith('&;'))  # Обработчик нажатия на Категорию. data = f"&;{m_theme_id};{m_theme}"
@@ -325,8 +320,6 @@ async def on_click_main_theme(callback: CallbackQuery):
         kb = create_inline_kb(width=1, back_btn='to_main_themes_btn', **get_themes_btns(callback.data))
         await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[2]}":</b>',
                                          parse_mode=ParseMode.HTML, reply_markup=kb)
-        conn, cursor = open_db_connection()
-        metrics(act='on_click_main_theme', user_info=callback.from_user, data=callback.data, cursor=cursor)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -334,13 +327,13 @@ async def on_click_main_theme(callback: CallbackQuery):
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
     finally:
-        close_db_connection(conn, cursor)
+        await metrics(act='on_click_main_theme', user_info=callback.from_user, data=callback.data)
 
 
 @dp.callback_query(F.data.startswith('to_main_themes_btn') | F.data.startswith('%;')) # Обработчик нажатия на тему или Назад
 async def on_click_theme_or_back(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
-        conn, cursor = open_db_connection()
         data = callback.data
         if data == 'to_main_themes_btn':
             kb = create_inline_kb(1, **get_themes_btns('main_themes'))  # Вызываем функцию строителя кнопок Категорий
@@ -370,8 +363,6 @@ async def on_click_theme_or_back(callback: CallbackQuery):
                 # Вызываем функцию строителя кнопок с номерами песен
                 kb = create_inline_kb(width=1, back_btn=f"song_btn;to_themes;{m_theme_id};{m_theme}")
             await callback.message.edit_text(text=content, parse_mode=ParseMode.HTML, reply_markup=kb)
-        metrics(act='on_click_theme' if data != 'to_main_themes_btn' else 'on_click_back_from_themes',
-                user_info=callback.from_user, data=data, cursor=cursor)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -380,24 +371,24 @@ async def on_click_theme_or_back(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        data = callback.data
+        await metrics(act='on_click_theme' if data != 'to_main_themes_btn' else 'on_click_back_from_themes',
+                      user_info=callback.from_user, data=data)
 
 
 @dp.callback_query(F.data.startswith('song_btn'))  # Обработчик нажатия на кнопку с номером песни
 async def on_click_song_or_back(callback: CallbackQuery):
     try:
         num = callback.data.split(';')[1]
-        conn, cursor = open_db_connection()
         if num == 'to_themes':
             # Вызываем функцию строителя кнопок с темами
             kb = create_inline_kb(1, back_btn='to_main_themes_btn', **get_themes_btns(f"&;{callback.data.split(';')[2]}"))
             await callback.message.edit_text(text=f'🔸 Категория <b>"{callback.data.split(";")[3]}":</b>',
                                              parse_mode=ParseMode.HTML, reply_markup=kb)
         else:
-            result = await return_song(num=num, tg_user_id=callback.from_user.id, cursor=cursor)  # Вызываем функцию поиска песни
+            result = await return_song(num=num, tg_user_id=callback.from_user.id)  # Вызываем функцию поиска песни
             await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
             await callback.answer()
-        metrics(act='on_click_song' if num != 'to_themes' else 'on_click_back_from_theme_songs',
-                user_info=callback.from_user, data=callback.data, cursor=cursor)
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -405,26 +396,21 @@ async def on_click_song_or_back(callback: CallbackQuery):
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
     finally:
-        close_db_connection(conn, cursor)
+        num = callback.data.split(';')[1]
+        await metrics(act='on_click_song' if num != 'to_themes' else 'on_click_back_from_theme_songs',
+                      user_info=callback.from_user, data=callback.data)
+
 
 
 @dp.message(F.text.isdigit())  # Обработчик ввода номера песни
 async def search_song_by_num(message: Message):
-    start_time = time.time()
     try:
         num = message.text
-        print(num)
-        conn, cursor = open_db_connection()
-        print('connected')
-        result = await return_song(num=num, tg_user_id=message.from_user.id, cursor=cursor)  # Вызываем функцию поиска песни
-        print('result')
+        result = await return_song(num=num, tg_user_id=message.from_user.id)  # Вызываем функцию поиска песни
         if result[0]:
             await message.answer(result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
         else:
             await message.answer(result[1])
-        print('answered')
-        metrics(act='search_song_by_num', user_info=message.from_user, data=f'{num}', cursor=cursor)
-        print('metrics')
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -432,14 +418,11 @@ async def search_song_by_num(message: Message):
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
     finally:
-        close_db_connection(conn, cursor)
-        print('closed')
-        end_time = time.time()
-        exec_time = end_time - start_time
-        print(exec_time)
+        await metrics(act='search_song_by_num', user_info=message.from_user, data=f'{message.text}')
 
 
-async def return_song(num, tg_user_id, cursor):
+async def return_song(num, tg_user_id):
+    conn, cursor = open_db_connection()
     try:
         cursor.execute(f"WITH upd_song AS (UPDATE songs SET cnt_using = COALESCE(cnt_using, 0) + 1 WHERE num = {num} "
                        f"RETURNING num, name, alt_name, text, en_name, authors, chords_file_id, audio_file_id, "
@@ -457,16 +440,18 @@ async def return_song(num, tg_user_id, cursor):
             return [False, lexicon.not_found_by_num]
     except Exception as e:
         logging.exception(e)
+    finally:
+        close_db_connection(conn, cursor)
 
 
 @dp.callback_query(F.data == 'fvrt_btn')  # Обработчик нажатия кнопки '🤍'
 async def on_click_favorites(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
         kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект клавиатуры
         heart_is_red: bool = kb.inline_keyboard[0][0].text == '❤️'  # Есть ли песня в избранном (только визуально)
         tg_user_id = callback.from_user.id
         num = callback.message.text.split()[0] if callback.message.text else callback.message.caption.split()[0]
-        conn, cursor = open_db_connection()
         cursor.execute(f"SELECT * FROM user_song_link WHERE tg_user_id={tg_user_id}")
         num_of_songs = len(cursor.fetchall())
         if num_of_songs > 59:
@@ -490,8 +475,6 @@ async def on_click_favorites(callback: CallbackQuery):
                                            'Весь список с Избранным можно вывести через Меню.', show_alert=True)
         if song_in_fvrt == heart_is_red:
             await callback.message.edit_reply_markup(reply_markup=kb)
-        metrics(act='on_click_favorites', user_info=callback.from_user,
-                data=f'on_click_red_heart {num}' if song_in_fvrt else f'on_click_white_heart {num}', cursor=cursor)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -500,16 +483,18 @@ async def on_click_favorites(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='on_click_favorites', user_info=callback.from_user,
+                      data=f'on_click_red_heart {num}' if song_in_fvrt else f'on_click_white_heart {num}')
 
 
 @dp.callback_query(F.data == 'Chords_btn')  # Обработчик нажатия кнопки "Аккорды"
 async def on_click_chords(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
         kb: InlineKeyboardMarkup = callback.message.reply_markup  # Достаём объект клавиатуры
         kb.inline_keyboard[0][1].text, kb.inline_keyboard[0][1].callback_data = 'Текст', 'txt_btn'
         first_str = callback.message.text.split('\n')[0]
         num = first_str.split()[0]
-        conn, cursor = open_db_connection()
         cursor.execute(f"SELECT chords_file_id FROM songs where num = {num}")
         chords_file_id = cursor.fetchone()[0]
         msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
@@ -525,7 +510,6 @@ async def on_click_chords(callback: CallbackQuery):
             file_id = photo_info.photo[-1].file_id
             cursor.execute(f"UPDATE songs SET chords_file_id = '{file_id}' WHERE num = {num}")
         await callback.answer()
-        metrics(act='on_click_chords', user_info=callback.from_user, data=num, cursor=cursor)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -534,17 +518,16 @@ async def on_click_chords(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='on_click_chords', user_info=callback.from_user, data=num)
 
 
 @dp.callback_query(F.data == 'txt_btn')  # Обработчик нажатия кнопки "Текст"
 async def on_click_text(callback: CallbackQuery):
     try:
         num = callback.message.caption.split()[0]
-        conn, cursor = open_db_connection()
-        result = await return_song(num=num, tg_user_id=callback.from_user.id, cursor=cursor)
+        result = await return_song(num=num, tg_user_id=callback.from_user.id)
         await callback.answer()
         await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
-        metrics(act='on_click_txt_btn', user_info=callback.from_user, data=num, cursor=cursor)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -552,15 +535,15 @@ async def on_click_text(callback: CallbackQuery):
                                f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
         logging.exception(e)
     finally:
-        close_db_connection(conn, cursor)
+        await metrics(act='on_click_txt_btn', user_info=callback.from_user, data=num)
 
 
 @dp.callback_query(F.data == 'audio_btn')  # Обработчик нажатия кнопки "Аудио"
 async def on_click_audio(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
         first_str = callback.message.text.split('\n')[0] if callback.message.text else callback.message.caption
         num = first_str.split()[0]
-        conn, cursor = open_db_connection()
         cursor.execute(f"SELECT audio_file_id FROM songs where num = {num}")
         audio_file_id = cursor.fetchone()[0]
         if audio_file_id != 'yes':
@@ -575,7 +558,6 @@ async def on_click_audio(callback: CallbackQuery):
             file_id_join = ';'.join(file_id)
             cursor.execute(f"UPDATE songs SET audio_file_id = '{file_id_join}' WHERE num = {num}")
         await callback.answer()
-        metrics(act='on_click_audio', user_info=callback.from_user, data=num, cursor=cursor)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -584,19 +566,19 @@ async def on_click_audio(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='on_click_audio', user_info=callback.from_user, data=num)
 
 
 @dp.callback_query(F.data == 'YouTube_btn')  # Обработчик нажатия кнопки "YouTube"
 async def on_click_youtube(callback: CallbackQuery):
+    conn, cursor = open_db_connection()
     try:
         num = callback.message.text.split()[0] if callback.message.text else callback.message.caption.split()[0]
-        conn, cursor = open_db_connection()
         cursor.execute(f"SELECT youtube_url FROM songs WHERE num = {num}")
         youtube_url = cursor.fetchone()[0]
         for elem in youtube_url.split(','):
             await callback.message.answer(text=elem)
         await callback.answer()
-        metrics(act='on_click_youtube', user_info=callback.from_user, data=num, cursor=cursor)
     except Exception as e:
         bot_user = callback.from_user
         await callback.message.answer(text=lexicon.error_msg)
@@ -605,13 +587,14 @@ async def on_click_youtube(callback: CallbackQuery):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='on_click_youtube', user_info=callback.from_user, data=num)
 
 
 @dp.message(F.text)  # Обработчик поиска по фразе
 async def search_song_by_text(message: Message):
+    conn, cursor = open_db_connection()
     try:
         txt = message.text
-        conn, cursor = open_db_connection()
         cursor.execute("SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(REPLACE(REPLACE(name || ' ' || "
                        "COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || "
                        "COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния') @@ PHRASETO_TSQUERY"
@@ -627,7 +610,6 @@ async def search_song_by_text(message: Message):
         kb = create_inline_kb(width, **btn_nums)  # Вызываем функцию строителя кнопок
         await message.answer(song_list + f'\n\n❗️ Показаны только первые 24 из {len(res)} найденных песен. '
                                 f'Сформулируйте запрос точнее. 🤷‍♂️' if len(res) > 24 else song_list, reply_markup=kb)
-        metrics(act='search_song_by_text', user_info=message.from_user, data=txt, cursor=cursor)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -636,18 +618,28 @@ async def search_song_by_text(message: Message):
         logging.exception(e)
     finally:
         close_db_connection(conn, cursor)
+        await metrics(act='search_song_by_text', user_info=message.from_user, data=txt)
 
 
 def open_db_connection():
-    conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
-    cursor = conn.cursor()
-    return conn, cursor
+    try:
+        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
+        cursor = conn.cursor()
+        return conn, cursor
+    except Exception as e:
+        logging.exception(e)
+        return None, None
 
 
 def close_db_connection(conn, cursor):
-    conn.commit()
-    cursor.close()
-    conn.close()
+    if conn and cursor:
+        try:
+            conn.commit()
+        except Exception as e:
+            logging.exception(e)
+        finally:
+            cursor.close()
+            conn.close()
 
 
 # Функция строителя клавиатуры после песни
@@ -736,7 +728,8 @@ def row_width(num_of_btns, max_width=8): # Функция расчёта опт�
     return width
 
 
-def metrics(cursor, act, user_info, data=None):  # Аналитика
+async def metrics(act, user_info, data=None):  # Аналитика
+    conn, cursor = open_db_connection()
     try:
         user_id, f_name, l_name, username, lang = (user_info.id, user_info.first_name, user_info.last_name,
                                                    user_info.username, user_info.language_code)
@@ -777,6 +770,8 @@ def metrics(cursor, act, user_info, data=None):  # Аналитика
                            f"last_access = current_timestamp(0) + INTERVAL '1 hours' WHERE tg_user_id = {user_id}")
     except Exception as e:
         logging.exception(e)
+    finally:
+        close_db_connection(conn, cursor)
 
 
 # Триггеры, функции, используемые в БД
