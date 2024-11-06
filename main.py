@@ -6,7 +6,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import CommandStart
 from aiogram.filters.command import Command
 import logging
-import psycopg2
+#import psycopg2
+import asyncpg
 import datetime
 from aiogram.enums import ParseMode
 from math import ceil
@@ -621,24 +622,22 @@ async def search_song_by_text(message: Message):
         await metrics(act='search_song_by_text', user_info=message.from_user, data=txt)
 
 
-def open_db_connection():
+async def open_db_connection():
     try:
-        conn = psycopg2.connect(dbname=db_name, host=db_host, user=db_user, password=db_password)
-        cursor = conn.cursor()
-        return conn, cursor
+        conn = await asyncpg.connect(f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}')
+        return conn
     except Exception as e:
         logging.exception(e)
-        return None, None
+        return None
 
 
-def close_db_connection(conn, cursor):
-    if conn and cursor:
+def close_db_connection(conn):
+    if conn:
         try:
             conn.commit()
         except Exception as e:
             logging.exception(e)
         finally:
-            cursor.close()
             conn.close()
 
 
