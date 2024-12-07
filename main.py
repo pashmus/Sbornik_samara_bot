@@ -75,7 +75,7 @@ async def get_users_info(message: Message):
             res_2 = await conn.fetch(query_2)
             daily_stat = format_stat_for_admin(res_2)
 
-            await message.answer(daily_stat + '\n\n' + glob_stat)
+            await message.answer(daily_stat + '\n' + '-'*50 + '\n' + glob_stat)
         else:
             # Если админ отправил запрос который начинается с "SELECT"
             my_select = await conn.fetch(message.text)
