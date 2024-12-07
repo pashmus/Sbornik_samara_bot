@@ -54,15 +54,28 @@ async def get_users_info(message: Message):
     conn = await open_db_connection()
     try:
         if message.text.strip().lower() == 'admin':
-            query = """SELECT 
-                    (SELECT COUNT(*) FROM users) AS a, 
-                    (SELECT COUNT(*) FROM users WHERE last_access >= current_date) AS b, 
-                    (SELECT COUNT(u.*) FROM users u JOIN periods p ON p.id = TO_CHAR(current_date, 'YYYY-MM') 
-                     WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end) AS c, 
-                    (SELECT SUM(cnt_by_content + cnt_by_nums + cnt_by_txt + cnt_by_chords + cnt_by_audio + 
-                    cnt_by_youtube) FROM metrics) AS d"""
-            res = await conn.fetchrow(query)
-            await message.answer(f'users: {res[0]} \nusers today: {res[1]} \nusers month: {res[2]} \nqueries: {res[3]}')
+            query_1 = """SELECT
+                    (SELECT COUNT(*) FROM users) AS a,
+                    (SELECT COUNT(*) FROM users WHERE last_access >= current_date) AS b,
+                    (SELECT COUNT(u.*) FROM users u JOIN periods p ON p.id = TO_CHAR(current_date, 'YYYY-MM')
+                     WHERE u.last_access BETWEEN p.dt_beg AND p.dt_end) AS c,
+                    (SELECT SUM(cnt_by_content + cnt_by_nums + cnt_by_txt + cnt_by_chords + cnt_by_audio +
+                    cnt_by_youtube) FROM metrics) AS d;"""
+            res_1 = await conn.fetchrow(query_1)
+            glob_stat = (f'Today_Users: {res_1[1]} \nMonth_Users: {res_1[2]} \n'
+                         f'All_Users: {res_1[0]} \nAll_Requests: {res_1[3]}')
+
+            query_2 = """SELECT to_char(ua.create_ts::date, 'YYYY-MM-DD') AS dt, 
+                    count(DISTINCT tg_user_id) AS users_cnt, 
+                    count(*) AS req_cnt 
+                    FROM user_actions ua 
+                    GROUP BY ua.create_ts::date 
+                    ORDER BY dt DESC 
+                    LIMIT 10;"""
+            res_2 = await conn.fetch(query_2)
+            daily_stat = format_stat_for_admin(res_2)
+
+            await message.answer(daily_stat + '\n\n' + glob_stat)
         else:
             # Если админ отправил запрос который начинается с "SELECT"
             my_select = await conn.fetch(message.text)
@@ -72,6 +85,20 @@ async def get_users_info(message: Message):
         await message.answer(str(e))
     finally:
         await close_db_connection(conn)
+
+
+def format_stat_for_admin(results):
+    # Заголовок таблицы
+    header = f"{'Date':<19}|{'Users':<8}|{'Requests':<8}"
+    separator = "-" * 50
+    lines = [header, separator]
+    # Добавление строк с результатами
+    for row in results:
+        date = row['dt']
+        users_cnt = row['users_cnt']
+        req_cnt = row['req_cnt']
+        lines.append(f"{date:<14}|{users_cnt:<11}|{req_cnt:<8}")
+    return "\n".join(lines)
 
 
 # Функция для получения разных списков песен
