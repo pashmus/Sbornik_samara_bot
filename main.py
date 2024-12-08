@@ -540,24 +540,28 @@ async def on_click_chords(callback: CallbackQuery):
         res = await conn.fetchrow("SELECT chords_file_id FROM songs where num = $1;", num)
         chords_file_id = res[0]
         msg_spoiled = is_msg_spoiled(callback.message.date.replace(tzinfo=None))
+        await (callback.message.delete() if not msg_spoiled else
+               callback.message.edit_text(text=f'Аккорды на песню "{first_str}" ниже...'))
         if chords_file_id:
-            await (callback.message.delete() if not msg_spoiled else
-                   callback.message.edit_text(text=f'Аккорды на песню "{first_str}" ниже...'))
             await callback.message.answer_photo(photo=chords_file_id, caption=first_str, reply_markup=kb)
         else:
             file = FSInputFile(f'Chords_jpg/{num}.jpg')
-            await (callback.message.delete() if not msg_spoiled else
-                   callback.message.edit_text(text=f'Аккорды на песню "{first_str}" ниже...'))
             photo_info = await callback.message.answer_photo(photo=file, caption=first_str, reply_markup=kb)
             file_id = photo_info.photo[-1].file_id
             await conn.execute("UPDATE songs SET chords_file_id = $1 WHERE num = $2;", file_id, num)
         await callback.answer()
     except Exception as e:
         bot_user = callback.from_user
-        await callback.message.answer(text=lexicon.error_msg)
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
-                               f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
-        logging.exception(e)
+        if e.args[0] in ("Telegram server says - Bad Request: message to delete not found",
+                         "'InaccessibleMessage' object has no attribute 'reply_markup'"):
+            await bot.send_message(chat_id=admin_id, text=f'''Скорее всего - двойной тап./ 
+                                   Error: {str(e)}\ndef on_click_chords/
+                                   user: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}''')
+        else:
+            await callback.message.answer(text=lexicon.error_msg)
+            await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
+                                   f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+            logging.exception(e)
     finally:
         await close_db_connection(conn)
         await metrics(act='on_click_chords', user_info=callback.from_user, data=num)
