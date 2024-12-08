@@ -641,10 +641,10 @@ async def search_song_by_text(message: Message):
     conn = await open_db_connection()
     try:
         txt = message.text
-        query = """SELECT num, name, alt_name, en_name FROM songs WHERE REPLACE(REPLACE(REPLACE(name || ' ' || 
-                COALESCE(alt_name, '') || ' ' || text || ' ' || COALESCE(en_name, '') || ' ' || 
-                COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния') @@ PHRASETO_TSQUERY
-                (REPLACE(REPLACE(REPLACE($1, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')) ORDER BY num"""
+        query = """SELECT num, name, alt_name, en_name FROM songs 
+                WHERE to_tsvector('russian', name || ' ' || COALESCE(alt_name, '') || ' ' || text || ' ' || 
+                COALESCE(en_name, '') || ' ' || COALESCE(authors, '')) 
+                @@ PHRASETO_TSQUERY('russian', $1) ORDER BY num;"""
         res = await conn.fetch(query, txt)
         num_of_songs = len(res) if len(res) < 25 else 24
         song_list = '' if res else lexicon.not_found_by_txt
