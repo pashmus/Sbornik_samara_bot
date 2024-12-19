@@ -102,7 +102,7 @@ def format_stat_for_admin(results):
 
 
 # Функция для получения разных списков песен
-@dp.message(Command(commands=['fvrt', 'sgm', 'gt', 'tr', 'hill', 'kk']))
+@dp.message(Command(commands=['fvrt', 'sgm', 'gt', 'tr', 'hill', 'kk', 'ch']))   # Убрать после Рождества
 async def get_song_list(message: Message):
     conn = await open_db_connection()
     try:
@@ -121,7 +121,9 @@ async def get_song_list(message: Message):
                           WHERE authors ILIKE '%Tomlin%' OR authors LIKE '%Redman%' ORDER BY num""",
                 '/hill': "SELECT num, name, alt_name, en_name FROM songs WHERE authors ILIKE '%Hillsong%' ORDER BY num",
                 '/kk': """SELECT num, name, alt_name, en_name FROM songs WHERE authors ILIKE '%Краеугольный Камень%' 
-                          ORDER BY num"""
+                          ORDER BY num""",
+                '/ch': """SELECT num, name, alt_name, en_name FROM songs WHERE num = ANY(string_to_array 
+                ((SELECT song_nums FROM themes WHERE theme = 'Рождество Христа'), ', ')::int[]) ORDER BY num"""   # Убрать после Рождества
             }
             res = await conn.fetch(query[c])
 
@@ -139,7 +141,7 @@ async def get_song_list(message: Message):
                 content[1] += (f"\n{str(res[i][0])} - {res[i][1]}" + ("" if not res[i][2] else
                                f'\n        ({res[i][2]})') + ("" if not res[i][3] else f'\n        ({res[i][3]})'))
 
-            if c in ('/gt', '/tr', '/hill', '/kk', '/fvrt'):
+            if c in ('/gt', '/tr', '/hill', '/kk', '/fvrt', '/ch'):    # Убрать после Рождества
                 btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
                 width = row_width(num_of_btns=num_of_songs, max_width=8)
                 kb = create_inline_kb(width, edit_btn='edit_fvrt' if c == '/fvrt' else None, **btn_nums)  # Вызываем функцию строителя кнопок
@@ -158,7 +160,7 @@ async def get_song_list(message: Message):
     finally:
         await close_db_connection(conn)
         c = message.text
-        await metrics(act='get_song_list' if c in ('/sgm', '/gt', '/tr', '/hill', '/kk') else 'get_song_list_fvrt',
+        await metrics(act='get_song_list' if c in ('/sgm', '/gt', '/tr', '/hill', '/kk', 'ch') else 'get_song_list_fvrt',    # Убрать после Рождества
                       user_info=message.from_user, data=c)
 
 
