@@ -648,9 +648,10 @@ async def search_song_by_text(message: Message):
     try:
         txt = message.text
         query = """SELECT num, name, alt_name, en_name FROM songs 
-                WHERE to_tsvector('russian', name || ' ' || COALESCE(alt_name, '') || ' ' || text || ' ' || 
-                COALESCE(en_name, '') || ' ' || COALESCE(authors, '')) 
-                @@ PHRASETO_TSQUERY('russian', $1) ORDER BY num;"""
+        WHERE to_tsvector('english', REPLACE(REPLACE(REPLACE(name || ' ' || COALESCE(alt_name, '') || ' ' || 
+        text || ' ' || COALESCE(en_name, '') || ' ' || COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')
+        ) @@ PHRASETO_TSQUERY('english', REPLACE(REPLACE(REPLACE($1, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')
+        ) ORDER BY num;""" # Когда было 'russian', то игнорируются предлоги, союзы и т.п. Слишком много песен на выходе ("Кто же я" не искалось). 'english' не влияет, но нужен, т.к. без языка не создаётся индекс.
         res = await conn.fetch(query, txt)
         num_of_songs = len(res) if len(res) < 25 else 24
         song_list = '' if res else lexicon.not_found_by_txt
