@@ -647,23 +647,40 @@ async def search_song_by_text(message: Message):
     conn = await open_db_connection()
     try:
         txt = message.text
-        query = """SELECT num, name, alt_name, en_name FROM songs 
-        WHERE to_tsvector('english', REPLACE(REPLACE(REPLACE(name || ' ' || COALESCE(alt_name, '') || ' ' || 
-        text || ' ' || COALESCE(en_name, '') || ' ' || COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')
-        ) @@ PHRASETO_TSQUERY('english', REPLACE(REPLACE(REPLACE($1, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')
-        ) ORDER BY num;""" # Когда было 'russian', то игнорируются предлоги, союзы и т.п. Слишком много песен на выходе ("Кто же я" не искалось). 'english' не влияет, но нужен, т.к. без языка не создаётся индекс.
+        query = """SELECT num, ts_headline(name, query, 'StartSel=<b><i>, StopSel=</i></b>'), 
+                          ts_headline(alt_name, query, 'StartSel=<b><i>, StopSel=</i></b>'), 
+                          ts_headline(en_name, query, 'StartSel=<b><i>, StopSel=</i></b>')
+                FROM songs, PHRASETO_TSQUERY('simple', REPLACE(REPLACE(REPLACE($1, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')) 
+                AS query
+                WHERE setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(name, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(alt_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'A') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(text, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'C') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(en_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') 
+                @@ query 
+                ORDER BY ts_rank(
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(name, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(alt_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'A') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(text, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'C') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(en_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') 
+                , query) DESC, num ASC;""" # Когда 'russian', то игнорируются предлоги, союзы и т.п. Поэтому слишком
+                    # много песен на выходе и "Кто же я" не искалось. 'simple' не влияет, но нужен, т.к. без языка
+                    # не создаётся индекс. Ещё добавил setweight + ts_rank, ts_headline.
+                    # В БД создан соответствующий индекс (tsvector_idx_srch_song).
         res = await conn.fetch(query, txt)
-        num_of_songs = len(res) if len(res) < 25 else 24
+        num_of_songs = len(res) if len(res) < 11 else 10
         song_list = '' if res else lexicon.not_found_by_txt
-        for song in res[0:24]:
+        for song in res[0:10]:
             song_list += (f"\n{str(song[0])} - {song[1]}" + ("" if not song[2] else f"\n        ({song[2]})") +
                           ("" if not song[3] else f"\n        ({song[3]})"))
-        btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res[0:24]}
+        btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res[0:10]}
         # Вызываем функцию подсчёта оптимальной ширины ряда
         width = row_width(num_of_btns=num_of_songs, max_width=8)
         kb: InlineKeyboardMarkup = create_inline_kb(width, **btn_nums)
-        await message.answer(song_list + f'\n\n❗️ Показаны только первые 24 из {len(res)} найденных песен. '
-                                f'Сформулируйте запрос точнее. 🤷‍♂️' if len(res) > 24 else song_list, reply_markup=kb)
+        await message.answer(song_list + f'\n\n❗️ Показаны только первые 10 из {len(res)} найденных песен. '
+                             f'Сформулируйте запрос точнее. 🤷‍♂️' if len(res) > 10 else song_list,
+                             parse_mode=ParseMode.HTML, reply_markup=kb)
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
