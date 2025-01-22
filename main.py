@@ -648,23 +648,23 @@ async def search_song_by_text(message: Message):
     try:
         txt = message.text
         query = """SELECT num, ts_headline(name, query, 'StartSel=<b><i>, StopSel=</i></b>'), 
-                          ts_headline(alt_name, query, 'StartSel=<b><i>, StopSel=</i></b>'), 
-                          ts_headline(en_name, query, 'StartSel=<b><i>, StopSel=</i></b>')
-                FROM songs, PHRASETO_TSQUERY('simple', REPLACE(REPLACE(REPLACE($1, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')) 
-                AS query
-                WHERE setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(name, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(alt_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'A') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(text, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'C') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(en_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') 
-                @@ query 
-                ORDER BY ts_rank(
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(name, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(alt_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'A') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(text, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'C') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(en_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
-                setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') 
-                , query) DESC, num ASC;""" # Когда 'russian', то игнорируются предлоги, союзы и т.п. Поэтому слишком
+            ts_headline(alt_name, query, 'StartSel=<b><i>, StopSel=</i></b>'), 
+            ts_headline(en_name, query, 'StartSel=<b><i>, StopSel=</i></b>')
+            FROM songs, PHRASETO_TSQUERY('simple', REPLACE(REPLACE(REPLACE($1, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')) 
+            AS query
+            WHERE setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(name, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(alt_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'A') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(text, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'C') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(en_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') 
+            @@ query 
+            ORDER BY ts_rank(
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(name, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(alt_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'A') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(text, 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'C') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(en_name, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') ||
+            setweight(to_tsvector('simple', REPLACE(REPLACE(REPLACE(COALESCE(authors, ''), 'ё', 'е'), 'нье', 'ние'), 'нья', 'ния')), 'B') 
+            , query) DESC, num ASC;""" # Когда 'russian', то игнорируются предлоги, союзы и т.п. Поэтому слишком
                     # много песен на выходе и "Кто же я" не искалось. 'simple' не влияет, но нужен, т.к. без языка
                     # не создаётся индекс. Ещё добавил setweight + ts_rank, ts_headline.
                     # В БД создан соответствующий индекс (tsvector_idx_srch_song).
