@@ -1,18 +1,19 @@
 from config_data.config import Config, load_config
 from lexicon.lexicon import Lexicon
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, FSInputFile)
+from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardButton,
+                           InlineKeyboardMarkup, Message, FSInputFile)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import CommandStart
 from aiogram.filters.command import Command
 import logging
-#import psycopg2
 import asyncpg
 import datetime
 from aiogram.enums import ParseMode
 from math import ceil
 from typing import Any, List, Tuple, Dict, Union
 import glob
+import random
 # import asyncio
 
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
@@ -37,7 +38,7 @@ dp = Dispatcher()
 @dp.message(CommandStart())
 async def welcome(message: Message):
     try:
-        await message.answer(text=lexicon.welcome_msg, parse_mode=ParseMode.HTML)
+        await message.answer(text=lexicon.welcome_msg, parse_mode=ParseMode.HTML, reply_markup=reply_kb())
     except Exception as e:
         bot_user = message.from_user
         await message.answer(text=lexicon.error_msg)
@@ -101,16 +102,41 @@ def format_stat_for_admin(results):
     return "\n".join(lines)
 
 
+# Функция вызова случайной песни
+@dp.message(F.text == 'Случайная песня')
+async def get_random_song(message: Message):
+    conn = await open_db_connection()
+    try:
+        num = random.randint(1, config.amount_songs.amount_songs)
+        res = await conn.fetch("SELECT num, name, alt_name, en_name FROM songs WHERE num = $1", num)
+        song = res[0]
+        song_pretty = (f"\n{str(song['num'])} - {song['name']}" + ("" if not song['alt_name'] else f"\n        ({song['alt_name']})") +
+                       ("" if not song['en_name'] else f"\n        ({song['en_name']})"))
+        btn_nums = {f"song_btn;{num[0]}": str(num[0]) for num in res}
+        kb: InlineKeyboardMarkup = create_inline_kb(1, **btn_nums)
+        await message.answer(song_pretty, parse_mode=ParseMode.HTML, reply_markup=kb)
+    except Exception as e:
+        bot_user, txt = message.from_user, message.text
+        await message.answer(text=lexicon.error_msg)
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef get_random_song; text: {txt}\nuser: '
+                                                      f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        logging.exception(e)
+    finally:
+        await close_db_connection(conn)
+        await metrics(act='get_random_song', user_info=message.from_user, data=message.text)
+
+
 # Функция для получения разных списков песен
 @dp.message(Command(commands=['fvrt', 'sgm', 'gt', 'tr', 'hill', 'kk', 'ch']))   # Убрать после Рождества
 async def get_song_list(message: Message):
     conn = await open_db_connection()
     try:
         c: str = message.text
+        user_id: int = message.from_user.id
         if c.startswith('/fvrt'):
             query = """SELECT s.num, s.name, s.alt_name, s.en_name FROM user_song_link usl 
                        JOIN songs s ON usl.song_num = s.num WHERE usl.tg_user_id = $1 ORDER BY create_ts DESC"""
-            res = await conn.fetch(query, message.from_user.id)
+            res = await conn.fetch(query, user_id)
         else:
             query: Dict[str: str] = {
                 '/sgm': """SELECT num, name, alt_name, en_name FROM songs WHERE authors ILIKE '%Sovereign Grace Music%' 
@@ -151,6 +177,15 @@ async def get_song_list(message: Message):
                 for elem in content:
                     if elem:
                         await message.answer(elem)
+
+            # Вызываем кнопку "Случайная песня" юзерам, которым ещё не показывали
+            user_flag = await conn.fetch("SELECT flag FROM users WHERE tg_user_id = $1", user_id)
+            flag_value = user_flag[0]['flag']
+            if not flag_value:
+                await message.answer(text=lexicon.random_song_btm, reply_markup=reply_kb())
+                add_flag_query = """UPDATE users SET flag = TRUE WHERE tg_user_id = $1"""
+                await conn.fetch(add_flag_query, user_id)
+
     except Exception as e:
         bot_user, txt = message.from_user, message.text
         await message.answer(text=lexicon.error_msg)
@@ -716,6 +751,15 @@ async def close_db_connection(conn):
             logging.exception(e)
 
 
+# Функция вызова кнопки 'Случайная песня'
+def reply_kb():
+    buttons = [
+        [KeyboardButton(text='Случайная песня')]
+    ]
+    kb: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+    return kb
+
+
 # Функция строителя клавиатуры после песни
 def under_song_kb(width: int, in_fvrt: bool, is_audio: bool, is_youtube: bool) -> InlineKeyboardMarkup:
     kb_builder = InlineKeyboardBuilder()
@@ -841,7 +885,7 @@ async def metrics(act, user_info, data=None):
             'on_click_edit_or_del_fvrt': 'cnt_by_fvrt', 'on_click_favorites': 'cnt_by_fvrt',
             'get_song_list_fvrt': 'cnt_by_fvrt', 'on_click_back_to_fvrt': 'cnt_by_fvrt',
             'on_click_main_theme': 'cnt_by_themes', 'on_click_theme': 'cnt_by_themes',
-            'on_click_back_from_theme_songs': 'cnt_by_themes'
+            'on_click_back_from_theme_songs': 'cnt_by_themes', 'get_random_song': 'cnt_by_random_song'
         }
         # Заполнение счётчиков
         if act in act_dict:
