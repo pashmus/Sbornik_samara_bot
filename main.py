@@ -123,7 +123,7 @@ async def get_random_song(message: Message):
         logging.exception(e)
     finally:
         await close_db_connection(conn)
-        await metrics(act='get_random_song', user_info=message.from_user, data=message.text)
+        await metrics(act='get_random_song', user_info=message.from_user, data=message.text + ' ' + str(num))
 
 
 # Функция для получения разных списков песен
@@ -754,7 +754,7 @@ async def close_db_connection(conn):
 # Функция вызова кнопки 'Случайная песня'
 def reply_kb():
     buttons = [
-        [KeyboardButton(text='Случайная песня')]
+        [KeyboardButton(text='🎲 Случайная песня')]
     ]
     kb: ReplyKeyboardMarkup = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
     return kb
