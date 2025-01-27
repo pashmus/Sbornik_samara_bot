@@ -103,7 +103,7 @@ def format_stat_for_admin(results):
 
 
 # Функция вызова случайной песни
-@dp.message(F.text == 'Случайная песня')
+@dp.message(F.text == '🎲 Случайная песня')
 async def get_random_song(message: Message):
     conn = await open_db_connection()
     try:
@@ -179,12 +179,11 @@ async def get_song_list(message: Message):
                         await message.answer(elem)
 
             # Вызываем кнопку "Случайная песня" юзерам, которым ещё не показывали
-            user_flag = await conn.fetch("SELECT flag FROM users WHERE tg_user_id = $1", user_id)
-            flag_value = user_flag[0]['flag']
-            if not flag_value:
+            user_flag = await conn.fetchrow("""WITH current_flag AS (SELECT flag FROM users WHERE tg_user_id = $1),
+                                            updated AS (UPDATE users SET flag = TRUE WHERE tg_user_id = $1 AND flag 
+                                            IS NOT TRUE) SELECT COALESCE(flag, FALSE) FROM current_flag;""", user_id)
+            if user_flag[0] is False:
                 await message.answer(text=lexicon.random_song_btm, reply_markup=reply_kb())
-                add_flag_query = """UPDATE users SET flag = TRUE WHERE tg_user_id = $1"""
-                await conn.fetch(add_flag_query, user_id)
 
     except Exception as e:
         bot_user, txt = message.from_user, message.text
@@ -458,9 +457,14 @@ async def on_click_song_or_back(callback: CallbackQuery) -> None:
                                              parse_mode=ParseMode.HTML, reply_markup=kb)
         else:
             # Вызываем функцию поиска песни
-            result = await return_song(num=int(key_data), tg_user_id=callback.from_user.id)
+            result: List[Union[bool, str, InlineKeyboardMarkup, bool]] = await return_song(num=int(key_data),
+                                                                                           tg_user_id=callback.from_user.id)
             await callback.message.answer(text=result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
             await callback.answer()
+
+            # Вызываем кнопку "Случайная песня" юзерам, которым ещё не показывали
+            if result[3] is False:
+                await callback.message.answer(text=lexicon.random_song_btm, reply_markup=reply_kb())
     except Exception as e:
         bot_user, txt = callback.from_user, callback.data
         await callback.message.answer(text=lexicon.error_msg)
@@ -479,9 +483,14 @@ async def search_song_by_num(message: Message) -> None:
     try:
         num = int(message.text)
         # Вызываем функцию поиска песни
-        result: List[Union[bool, str, InlineKeyboardMarkup]] = await return_song(num=num, tg_user_id=message.from_user.id)
+        result: List[Union[bool, str, InlineKeyboardMarkup, bool]] = await return_song(num=num,
+                                                                                       tg_user_id=message.from_user.id)
         if result[0]:
             await message.answer(result[1], parse_mode=ParseMode.HTML, reply_markup=result[2])
+
+            # Вызываем кнопку "Случайная песня" юзерам, которым ещё не показывали
+            if result[3] is False:
+                await message.answer(text=lexicon.random_song_btm, reply_markup=reply_kb())
         else:
             await message.answer(result[1])
     except Exception as e:
@@ -494,7 +503,7 @@ async def search_song_by_num(message: Message) -> None:
         await metrics(act='search_song_by_num', user_info=message.from_user, data=int(message.text))
 
 
-async def return_song(num, tg_user_id) -> List[Union[bool, str, InlineKeyboardMarkup]]:
+async def return_song(num, tg_user_id) -> List[Union[bool, str, InlineKeyboardMarkup, bool]]:
     conn = await open_db_connection()
     try:
         query = f"""WITH upd_song AS (
@@ -503,6 +512,11 @@ async def return_song(num, tg_user_id) -> List[Union[bool, str, InlineKeyboardMa
                 SELECT upd_song.*, EXISTS(SELECT 1 FROM user_song_link WHERE tg_user_id = $2 AND song_num = $1) 
                 FROM upd_song;"""
         res = await conn.fetchrow(query, num, tg_user_id)
+        # Достаём флаг у юзера
+        user_flag = await conn.fetchrow("""WITH current_flag AS (SELECT flag FROM users WHERE tg_user_id = $1),
+                                    updated AS (UPDATE users SET flag = TRUE WHERE tg_user_id = $1 AND flag IS NOT TRUE)
+                                    SELECT COALESCE(flag, FALSE) FROM current_flag;""", tg_user_id)
+        flag_value = user_flag[0]
         sep = '____________________________'
         if res:
             # Вызываем функцию строителя клавиатуры под песней
@@ -510,7 +524,7 @@ async def return_song(num, tg_user_id) -> List[Union[bool, str, InlineKeyboardMa
                                                      is_youtube=res[8] is not None)
             return [True, (f'<i>{res[0]}</i>' + (f'  <b>{res[2]}</b>\n\n' if res[2] else f'  <b>{res[1]}</b>\n\n') +
                            f'{res[3]}\n{sep}' + (f'\n<b>{res[4]}</b>' if res[4] else '') +
-                           (f'\n<i>{res[5]}</i>' if res[5] else '')), kb]
+                           (f'\n<i>{res[5]}</i>' if res[5] else '')), kb, flag_value]
         else:
             return [False, lexicon.not_found_by_num]
     except Exception as e:
@@ -589,16 +603,16 @@ async def on_click_chords(callback: CallbackQuery):
         await callback.answer()
     except Exception as e:
         bot_user = callback.from_user
-        if e.args[0] in ("Telegram server says - Bad Request: message to delete not found",
-                         "'InaccessibleMessage' object has no attribute 'reply_markup'"):
-            await bot.send_message(chat_id=admin_id, text='Скорее всего - двойной тап./ \n'
-                                   f'Error: {str(e)}\ndef on_click_chords/'
-                                   f'user: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
-        else:
-            await callback.message.answer(text=lexicon.error_msg)
-            await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
-                                   f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
-            logging.exception(e)
+        # if e.args[0] in ("Telegram server says - Bad Request: message to delete not found",
+        #                  "'InaccessibleMessage' object has no attribute 'reply_markup'"):
+        #     await bot.send_message(chat_id=admin_id, text='Скорее всего - двойной тап./ \n'
+        #                            f'Error: {str(e)}\ndef on_click_chords/'
+        #                            f'user: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        # else:
+        await callback.message.answer(text=lexicon.error_msg)
+        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
+                               f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        logging.exception(e)
     finally:
         await close_db_connection(conn)
         await metrics(act='on_click_chords', user_info=callback.from_user, data=num)
