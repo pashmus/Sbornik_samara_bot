@@ -603,16 +603,17 @@ async def on_click_chords(callback: CallbackQuery):
         await callback.answer()
     except Exception as e:
         bot_user = callback.from_user
-        # if e.args[0] in ("Telegram server says - Bad Request: message to delete not found",
-        #                  "'InaccessibleMessage' object has no attribute 'reply_markup'"):
-        #     await bot.send_message(chat_id=admin_id, text='Скорее всего - двойной тап./ \n'
-        #                            f'Error: {str(e)}\ndef on_click_chords/'
-        #                            f'user: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
-        # else:
-        await callback.message.answer(text=lexicon.error_msg)
-        await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
-                               f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
-        logging.exception(e)
+        print(e.message)
+        if e.message in ("Bad Request: message to delete not found",
+                         "'InaccessibleMessage' object has no attribute 'reply_markup'"):
+            await bot.send_message(chat_id=admin_id, text='Скорее всего - двойной тап./ \n'
+                                   f'Error: {str(e)}\ndef on_click_chords/'
+                                   f'user: {bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+        else:
+            await callback.message.answer(text=lexicon.error_msg)
+            await bot.send_message(chat_id=admin_id, text=f'Error: {str(e)}\ndef on_click_chords\nuser: '
+                                   f'{bot_user.id, bot_user.username, bot_user.first_name, bot_user.last_name}')
+            logging.exception(e)
     finally:
         await close_db_connection(conn)
         await metrics(act='on_click_chords', user_info=callback.from_user, data=num)
