@@ -18,6 +18,10 @@ else
     echo "[$(date +"%Y-%m-%d %H:%M:%S")] Ошибка при резервном копировании" >> $BACKUP_DIR/backup.log
 fi
 
+# Удаление старых резервных копий (старше 30 дней)
+find $BACKUP_DIR -type f -name "*.backup" -mtime +180 -exec rm -f {} \;
+echo "[$(date +"%Y-%m-%d %H:%M:%S")] Удалены резервные копии старше 180 дней" >> $BACKUP_DIR/backup.log
+
 # Этот файл переносим на сервер (через гит)
 # Затем на сервере делаем этот скрипт исполняемым: chmod +x /home/sbornik_bot/backup_script.sh
 #
