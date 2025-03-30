@@ -3,3 +3,11 @@
 errors.log
 /venv/
 /Cheat_sheet.md
+db_backups/*     # Игнорировать ВСЁ в папке db_backups
+!db_backups/.gitkeep  # НО не игнорировать файл .gitkeep
+
+nohup.out
+
+# Временные файлы Python
+__pycache__/
+*/__pycache__/
