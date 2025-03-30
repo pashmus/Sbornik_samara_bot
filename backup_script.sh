@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Переменные
-BACKUP_DIR="/home/sbornik_bot/db_backups"
+BACKUP_DIR="/home/sbornik_bot_admin/Sbornik_samara_bot/db_backups"
 DB_NAME="sbornik_bot_db"
 DB_USER="avp"
 DATE=$(date +%Y%m%d)
@@ -23,7 +23,7 @@ find $BACKUP_DIR -type f -name "*.backup" -mtime +180 -exec rm -f {} \;
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Удалены резервные копии старше 180 дней" >> $BACKUP_DIR/backup.log
 
 # Этот файл переносим на сервер (через гит)
-# Затем на сервере делаем этот скрипт исполняемым: chmod +x /home/sbornik_bot/backup_script.sh
+# Затем на сервере делаем этот скрипт исполняемым: chmod +x /home/sbornik_bot_admin/Sbornik_samara_bot/backup_script.sh
 #
 # Настройка cron ("Command Run On" или «Chronos»):
 # Открой файл crontab для редактирования: crontab -e
