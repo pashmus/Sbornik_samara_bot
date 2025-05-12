@@ -12,3 +12,4 @@ nohup.out
 # Временные файлы Python
 __pycache__/
 */__pycache__/
+db_backups/*
