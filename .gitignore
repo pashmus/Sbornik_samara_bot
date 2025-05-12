@@ -5,6 +5,7 @@ errors.log
 /Cheat_sheet.md
 db_backups/*     # Игнорировать ВСЁ в папке db_backups
 !db_backups/.gitkeep  # НО не игнорировать файл .gitkeep
+/Audio/
 
 nohup.out
 
