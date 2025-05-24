@@ -13,4 +13,7 @@ nohup.out
 __pycache__/
 */__pycache__/
 db_backups/*
-/.idea/
+
+# PyCharm/IntelliJ IDEA
+.idea/
+*.iml
