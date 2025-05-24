@@ -19,6 +19,7 @@ import random
 log_format = '[{asctime}] #{levelname:8} {filename}: {lineno} in {funcName} - {name} - {message}'
 logging.basicConfig(filename='errors.log', level=logging.ERROR, format=log_format, style='{')
 
+# Переключение БД теперь в Config
 # is_db_remote = False  # Переключение БД локальной или удалённой
 # config: Config = load_config(".env.remote") if is_db_remote else load_config(".env")
 config: Config = load_config()
