@@ -43,7 +43,7 @@ async def process_song_folders(bot: Bot) -> None:
     conn = await asyncpg.connect(**DB_CONFIG)
 
     # Получаем список всех папок с песнями
-    song_folders = glob.glob('Audio/*/')
+    song_folders = glob.glob('Audio/391/')
 
     for folder in song_folders:
         try:
@@ -66,7 +66,7 @@ async def process_song_folders(bot: Bot) -> None:
             if file_ids:
                 # Обновляем базу данных
                 await conn.execute(
-                    "UPDATE songs_migr SET audio_file_id = $1 WHERE num = $2", ';'.join(file_ids), num
+                    "UPDATE songs SET audio_file_id = $1 WHERE num = $2", ';'.join(file_ids), num
                 )
                 print(f"Обновлены file_id для песни №{num}")
 
