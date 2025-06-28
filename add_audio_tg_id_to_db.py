@@ -1,3 +1,6 @@
+# Загрузка аудио в телеграм бот и запись audio_id в БД
+# Перед выполнением поменять в Config is_db_remote
+
 import os
 import glob
 import asyncio
@@ -5,8 +8,7 @@ from aiogram import Bot
 from aiogram.types import FSInputFile
 import asyncpg
 from typing import List
-
-# Импортируем вашу конфигурацию
+# Импортируем конфигурацию
 from config_data.config import Config, load_config
 
 # Загружаем конфигурацию
@@ -22,6 +24,8 @@ DB_CONFIG = {
     'password': config.db.db_password
 }
 
+# Подставляем номер песни для обработки. Если нужно обработать несколько песен, в строке 50 выбираем папку
+song_num = 398
 
 async def upload_audio_to_telegram(bot: Bot, file_path: str, caption: str = "") -> str:
     """Загружает аудиофайл в Telegram и возвращает file_id"""
@@ -43,7 +47,8 @@ async def process_song_folders(bot: Bot) -> None:
     conn = await asyncpg.connect(**DB_CONFIG)
 
     # Получаем список всех папок с песнями
-    song_folders = glob.glob('Audio/391/')
+    # song_folders = glob.glob('Audio/*/')
+    song_folders = glob.glob(f'Audio/{song_num}/')
 
     for folder in song_folders:
         try:
