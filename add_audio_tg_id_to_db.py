@@ -11,6 +11,9 @@ from typing import List
 # Импортируем конфигурацию
 from config_data.config import Config, load_config
 
+# Подставляем номер песни для обработки. Если нужно обработать несколько песен, в строке 50 выбираем папку
+song_num = 337
+
 # Загружаем конфигурацию
 config: Config = load_config()
 
@@ -23,9 +26,6 @@ DB_CONFIG = {
     'user': config.db.db_user,
     'password': config.db.db_password
 }
-
-# Подставляем номер песни для обработки. Если нужно обработать несколько песен, в строке 50 выбираем папку
-song_num = 398
 
 async def upload_audio_to_telegram(bot: Bot, file_path: str, caption: str = "") -> str:
     """Загружает аудиофайл в Telegram и возвращает file_id"""
