@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from environs import Env
 
-amount_songs = 398
+amount_songs = 399
 is_db_remote = False  # Переключение БД локальной или удалённой
 path = ".env.remote" if is_db_remote else ".env"
 

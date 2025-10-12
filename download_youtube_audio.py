@@ -1,4 +1,5 @@
 # Преобразование YouTube ссылок из БД в аудио
+# Перед выполнением поменять в Config is_db_remote
 
 import yt_dlp
 import psycopg2
@@ -12,7 +13,7 @@ from config_data.config import Config, load_config
 config: Config = load_config()
 
 # Подставляем наши номера песен для преобразования
-song_nums = '337'
+song_nums = '399'
 # Подставляем путь для сохранения песен
 path_for_audio_files = 'D:\\Work\\2023_Sbornik_Samara_Bot\\Sbornik_samara_bot\\Audio'
 
