@@ -6,6 +6,7 @@ errors.log
 db_backups/*     # Игнорировать ВСЁ в папке db_backups
 !db_backups/.gitkeep  # НО не игнорировать файл .gitkeep
 /Audio/
+/converter_files/
 
 nohup.out
 

@@ -12,7 +12,7 @@ from typing import List
 from config_data.config import Config, load_config
 
 # Подставляем номер песни для обработки. Если нужно обработать несколько песен, в строке 50 выбираем папку
-song_num = 401
+song_num = 402
 
 # Загружаем конфигурацию
 config: Config = load_config()
