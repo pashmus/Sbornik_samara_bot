@@ -355,7 +355,7 @@ async def on_click_content(callback: CallbackQuery):
             'cont5': [201, 250],
             'cont6': [251, 300],
             'cont7': [301, 350],
-            'cont8': [351, 400]
+            'cont8': [351, 410]
         }
         query = "SELECT num, name, alt_name, en_name FROM songs WHERE num BETWEEN $1 and $2 ORDER BY num"
         res = await conn.fetch(query, *ranges[c])
